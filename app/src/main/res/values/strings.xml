@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">Sample WebRTC</string>
+
+    <string name="drawer_header">Chromium WebRTC</string>
+    <string name="action_settings">Settings</string>
+
+    <!--Slider Tab Headers-->
+    <string name="slider_call_header">Call Session</string>
+    <string name="slider_device_header">Call List</string>
+
+    <!--Navigation Drawer-->
+    <string name="nav_item_actions">Call Actions</string>
+    <string name="nav_item_about">About</string>
+    <string name="nav_item_settings">Settings (Not active yet)</string>
+    <string name="nav_item_settings_primary">Primary</string>
+    <string name="nav_item_settings_other">Other</string>
+
+    <!--Call List Fragment-->
+    <string name="swipe_refresh_tip">Pull down to update List…</string>
+</resources>
