@@ -1,5 +1,7 @@
 package com.gensagames.samplewebrtc.view;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.design.widget.CoordinatorLayout;
@@ -12,6 +14,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.view.MenuItem;
 import android.view.View;
 
+import com.gensagames.samplewebrtc.engine.VoIPEngineService;
 import com.gensagames.samplewebrtc.view.fragments.MainSliderFragment;
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.view.fragments.AboutFragment;
@@ -29,6 +32,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        startService(new Intent(VoIPEngineService.ACTION_IDLE, Uri.EMPTY,
+                getApplicationContext(), VoIPEngineService.class));
 
         /**
          *Setup the DrawerLayout and NavigationView
@@ -72,9 +77,6 @@ public class MainActivity extends AppCompatActivity {
             }
 
         });
-
-
-
     }
 
     private void makeFragmentTransaction (Fragment fragment) {

@@ -1,4 +1,4 @@
-package com.gensagames.samplewebrtc.controller;
+package com.gensagames.samplewebrtc.signaling;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -11,7 +11,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-import com.gensagames.samplewebrtc.controller.helper.OnBluetoothResponse;
+import com.gensagames.samplewebrtc.signaling.helper.OnBluetoothResponse;
 
 /**
  * Created by GensaGames
@@ -22,7 +22,7 @@ public class BluetoothMonitorController {
 
     private static final String TAG = BluetoothMonitorController.class.getSimpleName();
 
-    private static final int REQUEST_BLUETOOTH = 1;
+    private static final int REQUEST_BLUETOOTH = 707;
     private static final long KEEP_SEARCH_ALIVE = java.util.concurrent.
             TimeUnit.SECONDS.toMillis(30);
 
@@ -49,16 +49,16 @@ public class BluetoothMonitorController {
         }
     }
 
-    public void registerMonitor (Context context) {
+    public void registerMonitor (Activity activity) {
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothDevice.ACTION_FOUND);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
         filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        context.registerReceiver(mBluetoothReceiver, filter);
+        activity.registerReceiver(mBluetoothReceiver, filter);
     }
 
-    public void unRegisterMonitor (Context context) {
-        context.unregisterReceiver(mBluetoothReceiver);
+    public void unRegisterMonitor (Activity activity) {
+        activity.unregisterReceiver(mBluetoothReceiver);
     }
 
 

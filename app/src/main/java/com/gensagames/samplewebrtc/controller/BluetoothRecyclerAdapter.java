@@ -19,7 +19,12 @@ import java.util.List;
 public class BluetoothRecyclerAdapter extends RecyclerView.Adapter
         <BluetoothDeviceItem.BluetoothDeviceHolder> {
 
+    public interface OnItemClickListener {
+        void onItemClick(int position);
+    }
+
     private List<BluetoothDeviceItem> mBluetoothDeviceItemList;
+    private OnItemClickListener mOnItemClickListener;
 
     public BluetoothRecyclerAdapter() {
         mBluetoothDeviceItemList = new ArrayList<>();
@@ -31,7 +36,8 @@ public class BluetoothRecyclerAdapter extends RecyclerView.Adapter
 
         View itemView = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.adapter_bluetooth_item, parent, false);
-        return new BluetoothDeviceItem.BluetoothDeviceHolder(itemView);
+        return new BluetoothDeviceItem.BluetoothDeviceHolder(itemView,
+                mOnItemClickListener);
     }
 
     @Override
@@ -46,5 +52,9 @@ public class BluetoothRecyclerAdapter extends RecyclerView.Adapter
 
     public List<BluetoothDeviceItem> getWorkingItems () {
         return mBluetoothDeviceItemList;
+    }
+
+    public void setOnItemClickListener(OnItemClickListener onItemClickListener) {
+        this.mOnItemClickListener = onItemClickListener;
     }
 }

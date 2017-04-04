@@ -1,16 +1,18 @@
 package com.gensagames.samplewebrtc.view.fragments;
 
 import android.annotation.SuppressLint;
-import android.bluetooth.BluetoothAdapter;
+import android.app.Activity;
+import android.app.Dialog;
 import android.bluetooth.BluetoothDevice;
-import android.content.BroadcastReceiver;
-import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.IntentFilter;
+import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.widget.SwipeRefreshLayout;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -20,9 +22,10 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import com.gensagames.samplewebrtc.R;
-import com.gensagames.samplewebrtc.controller.BluetoothMonitorController;
+import com.gensagames.samplewebrtc.engine.VoIPEngineService;
+import com.gensagames.samplewebrtc.signaling.BluetoothMonitorController;
 import com.gensagames.samplewebrtc.controller.BluetoothRecyclerAdapter;
-import com.gensagames.samplewebrtc.controller.helper.OnBluetoothResponse;
+import com.gensagames.samplewebrtc.signaling.helper.OnBluetoothResponse;
 import com.gensagames.samplewebrtc.model.BluetoothDeviceItem;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
 
@@ -31,7 +34,7 @@ import java.util.List;
 import java.util.Random;
 
 public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnRefreshListener,
-        OnBluetoothResponse, OnSliderPageSelected {
+        OnBluetoothResponse, OnSliderPageSelected, BluetoothRecyclerAdapter.OnItemClickListener {
 
     private static final String TAG = CallListFragment.class.getSimpleName();
 
@@ -58,12 +61,12 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
         setupAdapter();
 
         mBluetoothMonitorController = new BluetoothMonitorController(this);
-        mBluetoothMonitorController.registerMonitor(getContext());
+        mBluetoothMonitorController.registerMonitor(getActivity());
     }
 
     @Override
     public void onDestroyView() {
-        mBluetoothMonitorController.unRegisterMonitor(getContext());
+        mBluetoothMonitorController.unRegisterMonitor(getActivity());
         super.onDestroyView();
     }
 
@@ -73,7 +76,30 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     }
 
     /**
-     * Bluetooth events. For starting and listening new devices
+     * Listening changes, when this page
+     * already scrolled and selected
+     */
+    @Override
+    public void onThisPageSelected() {
+        mBluetoothMonitorController.startSearch(getActivity());
+
+    }
+
+    /**
+     * Recycler Item Clicked
+     */
+    @Override
+    public void onItemClick(int position) {
+        BluetoothDeviceItem item = mBluetoothRecyclerAdapter
+                .getWorkingItems().get(position);
+        getDialogForSignalingCall(getString(R.string.dialog_tittle_make_call), getString(R
+                .string.dialog_msg_make_call, item.getDeviceName()), item)
+                .show();
+    }
+
+    /**
+     * Bluetooth events.
+     * For starting and listening new devices
      */
 
     @Override
@@ -90,21 +116,10 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     }
 
     @Override
-    public void onDiscovery(BluetoothDevice device) {
+    public void onDiscovery(@NonNull BluetoothDevice device) {
         mBluetoothRecyclerAdapter.getWorkingItems().add(new
-                BluetoothDeviceItem(device.getName(), device.getAddress()));
+                BluetoothDeviceItem(device));
         mBluetoothRecyclerAdapter.notifyDataSetChanged();
-
-    }
-
-    /**
-     * Listening changes, when this page
-     * already scrolled and selected
-     */
-    @Override
-    public void onThisPageSelected() {
-        Log.i(TAG, "This page selected!");
-        mBluetoothMonitorController.startSearch(getActivity());
 
     }
 
@@ -116,18 +131,39 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
 
         mBluetoothRecyclerAdapter = new BluetoothRecyclerAdapter();
+        mBluetoothRecyclerAdapter.setOnItemClickListener(this);
         mRecyclerView.setAdapter(mBluetoothRecyclerAdapter);
         mBluetoothRecyclerAdapter.notifyDataSetChanged();
     }
 
-
-    private List<BluetoothDeviceItem> getStubs () {
-        List<BluetoothDeviceItem> items = new ArrayList<>();
-        for (int i = 0; i <= 20; i++) {
-            items.add(new BluetoothDeviceItem("Device "
-                    + new Random().nextInt(99), "Info...."));
-        }
-        return items;
+    private void startSignalingCall (@NonNull BluetoothDeviceItem device) {
+        Activity activityContext = getActivity();
+        Intent intent = new Intent(VoIPEngineService.ACTION_START_CALL, Uri.EMPTY,
+                activityContext, VoIPEngineService.class);
+        intent.putExtra(VoIPEngineService.EXTRA_START_CALL, device);
+        activityContext.startService(intent);
     }
+
+    private AlertDialog getDialogForSignalingCall (String tittle, String msg,
+                                                   final BluetoothDeviceItem item) {
+        return new AlertDialog.Builder(getActivity())
+                .setTitle(tittle)
+                .setMessage(msg)
+                .setCancelable(true)
+                .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        startSignalingCall(item);
+                        dialog.cancel();
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.cancel();
+                    }
+                }).create();
+    }
+
 
 }

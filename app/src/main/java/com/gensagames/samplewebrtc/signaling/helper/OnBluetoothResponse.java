@@ -1,6 +1,7 @@
-package com.gensagames.samplewebrtc.controller.helper;
+package com.gensagames.samplewebrtc.signaling.helper;
 
 import android.bluetooth.BluetoothDevice;
+import android.support.annotation.NonNull;
 
 /**
  * Created by GensaGames
@@ -10,5 +11,5 @@ import android.bluetooth.BluetoothDevice;
 public interface OnBluetoothResponse {
     void onDiscoveryStarted ();
     void onDiscoveryFinished ();
-    void onDiscovery(BluetoothDevice device );
+    void onDiscovery(@NonNull BluetoothDevice device );
 }
