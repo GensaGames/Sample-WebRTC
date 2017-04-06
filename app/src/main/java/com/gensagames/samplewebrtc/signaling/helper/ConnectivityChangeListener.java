@@ -1,6 +1,6 @@
 package com.gensagames.samplewebrtc.signaling.helper;
 
-import com.gensagames.samplewebrtc.signaling.BluetoothConnectivityService;
+import com.gensagames.samplewebrtc.signaling.BtConnectivityService;
 
 /**
  * Created by GensaGames
@@ -8,5 +8,5 @@ import com.gensagames.samplewebrtc.signaling.BluetoothConnectivityService;
  */
 
 public interface ConnectivityChangeListener {
-    void onConnectivityStateChanged (BluetoothConnectivityService.ConnectionState state);
+    void onConnectivityStateChanged (BtConnectivityService.ConnectionState state);
 }

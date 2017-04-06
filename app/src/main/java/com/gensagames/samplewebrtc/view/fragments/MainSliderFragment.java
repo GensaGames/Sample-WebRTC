@@ -18,7 +18,8 @@ import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.view.helper.FragmentHeaderTransaction;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
 
-public class MainSliderFragment extends Fragment implements FragmentHeaderTransaction, ViewPager.OnPageChangeListener {
+public class MainSliderFragment extends Fragment implements FragmentHeaderTransaction,
+        ViewPager.OnPageChangeListener {
 
     private TabLayout mTabLayout;
     private ViewPager mViewPager;

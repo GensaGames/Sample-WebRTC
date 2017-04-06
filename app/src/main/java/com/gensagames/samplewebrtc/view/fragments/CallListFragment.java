@@ -2,7 +2,6 @@ package com.gensagames.samplewebrtc.view.fragments;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.Dialog;
 import android.bluetooth.BluetoothDevice;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -24,17 +23,13 @@ import android.view.ViewGroup;
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
 import com.gensagames.samplewebrtc.signaling.BluetoothMonitorController;
-import com.gensagames.samplewebrtc.controller.BluetoothRecyclerAdapter;
+import com.gensagames.samplewebrtc.controller.BtRecyclerAdapter;
 import com.gensagames.samplewebrtc.signaling.helper.OnBluetoothResponse;
-import com.gensagames.samplewebrtc.model.BluetoothDeviceItem;
+import com.gensagames.samplewebrtc.model.BtDeviceItem;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-
 public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnRefreshListener,
-        OnBluetoothResponse, OnSliderPageSelected, BluetoothRecyclerAdapter.OnItemClickListener {
+        OnBluetoothResponse, OnSliderPageSelected, BtRecyclerAdapter.OnItemClickListener {
 
     private static final String TAG = CallListFragment.class.getSimpleName();
 
@@ -42,7 +37,7 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     private RecyclerView mRecyclerView;
     private SwipeRefreshLayout mSwipeRefreshLayout;
 
-    private BluetoothRecyclerAdapter mBluetoothRecyclerAdapter;
+    private BtRecyclerAdapter mBtRecyclerAdapter;
     private BluetoothMonitorController mBluetoothMonitorController;
 
     @Override
@@ -90,7 +85,8 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
      */
     @Override
     public void onItemClick(int position) {
-        BluetoothDeviceItem item = mBluetoothRecyclerAdapter
+        Log.d(TAG, "OnItemClick..");
+        BtDeviceItem item = mBtRecyclerAdapter
                 .getWorkingItems().get(position);
         getDialogForSignalingCall(getString(R.string.dialog_tittle_make_call), getString(R
                 .string.dialog_msg_make_call, item.getDeviceName()), item)
@@ -117,9 +113,9 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
 
     @Override
     public void onDiscovery(@NonNull BluetoothDevice device) {
-        mBluetoothRecyclerAdapter.getWorkingItems().add(new
-                BluetoothDeviceItem(device));
-        mBluetoothRecyclerAdapter.notifyDataSetChanged();
+        mBtRecyclerAdapter.getWorkingItems().add(new BtDeviceItem(device,
+                getString(R.string.name_unknown)));
+        mBtRecyclerAdapter.notifyDataSetChanged();
 
     }
 
@@ -130,13 +126,15 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
         mRecyclerView.setLayoutManager(mLayoutManager);
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
 
-        mBluetoothRecyclerAdapter = new BluetoothRecyclerAdapter();
-        mBluetoothRecyclerAdapter.setOnItemClickListener(this);
-        mRecyclerView.setAdapter(mBluetoothRecyclerAdapter);
-        mBluetoothRecyclerAdapter.notifyDataSetChanged();
+        mBtRecyclerAdapter = new BtRecyclerAdapter();
+        mBtRecyclerAdapter.setOnItemClickListener(this);
+        mRecyclerView.setAdapter(mBtRecyclerAdapter);
+        mBtRecyclerAdapter.notifyDataSetChanged();
     }
 
-    private void startSignalingCall (@NonNull BluetoothDeviceItem device) {
+    private void startSignalingCall (@NonNull BtDeviceItem device) {
+        Log.d(TAG, "startSignalingCall to Device: " + device.getDeviceName());
+        mBluetoothMonitorController.cancelSearch();
         Activity activityContext = getActivity();
         Intent intent = new Intent(VoIPEngineService.ACTION_START_CALL, Uri.EMPTY,
                 activityContext, VoIPEngineService.class);
@@ -145,7 +143,7 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     }
 
     private AlertDialog getDialogForSignalingCall (String tittle, String msg,
-                                                   final BluetoothDeviceItem item) {
+                                                   final BtDeviceItem item) {
         return new AlertDialog.Builder(getActivity())
                 .setTitle(tittle)
                 .setMessage(msg)

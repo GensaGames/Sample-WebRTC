@@ -18,5 +18,9 @@
     <!--Call List Fragment-->
     <string name="swipe_refresh_tip">Pull down to update List…</string>
     <string name="dialog_tittle_make_call">Make Call</string>
-    <string name="dialog_msg_make_call">Make Bluetooth Signaling call to the User %1$s</string>
+    <string name="dialog_msg_make_call">Make Bluetooth Signaling Call to the User - %1$s</string>
+
+
+    <!-- Other -->
+    <string name="name_unknown">Unknown</string>
 </resources>

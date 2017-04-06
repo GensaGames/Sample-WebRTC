@@ -49,6 +49,14 @@ public class BluetoothMonitorController {
         }
     }
 
+    public void cancelSearch () {
+        if (mBluetoothAdapter == null) {
+            Log.e(TAG, "Device doesn't support Bluetooth?");
+            return;
+        }
+        mBluetoothAdapter.cancelDiscovery();
+    }
+
     public void registerMonitor (Activity activity) {
         IntentFilter filter = new IntentFilter();
         filter.addAction(BluetoothDevice.ACTION_FOUND);
@@ -88,7 +96,7 @@ public class BluetoothMonitorController {
         @Override
         public void run() {
             Log.i(TAG, "Action to stop searching!");
-            mBluetoothAdapter.cancelDiscovery();
+            cancelSearch();
         }
     };
 }

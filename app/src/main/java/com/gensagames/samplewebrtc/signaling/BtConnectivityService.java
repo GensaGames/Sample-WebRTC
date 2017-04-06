@@ -14,24 +14,24 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
 
-import static com.gensagames.samplewebrtc.signaling.BluetoothConnectivityService.ConnectionState.IDLE;
-import static com.gensagames.samplewebrtc.signaling.BluetoothConnectivityService.ConnectionState.STATE_CONNECTED;
-import static com.gensagames.samplewebrtc.signaling.BluetoothConnectivityService.ConnectionState.STATE_CONNECTING;
-import static com.gensagames.samplewebrtc.signaling.BluetoothConnectivityService.ConnectionState.STATE_LISTEN;
+import static com.gensagames.samplewebrtc.signaling.BtConnectivityService.ConnectionState.IDLE;
+import static com.gensagames.samplewebrtc.signaling.BtConnectivityService.ConnectionState.STATE_CONNECTED;
+import static com.gensagames.samplewebrtc.signaling.BtConnectivityService.ConnectionState.STATE_CONNECTING;
+import static com.gensagames.samplewebrtc.signaling.BtConnectivityService.ConnectionState.STATE_LISTEN;
 
 /**
  * Created by GensaGames
  * GensaGames
  */
 
-public class BluetoothConnectivityService {
+public class BtConnectivityService {
 
-    private static final String TAG = BluetoothConnectivityService.class.getSimpleName();
-    private static final String SERVICE_NAME = BluetoothConnectivityService.class.getSimpleName();
+    private static final String TAG = BtConnectivityService.class.getSimpleName();
+    private static final String SERVICE_NAME = BtConnectivityService.class.getSimpleName();
 
     private final BluetoothAdapter mAdapter;
     private final OnMessageObservable mOnMessageObservable;
-    private final UUID mLocalDeviceUuid;
+    private final UUID mLocalDeviceUuid = UUID.nameUUIDFromBytes(SERVICE_NAME.getBytes());
     private ConnectivityChangeListener mConnectivityChangeListener;
 
     private CalleeTask mCalleeTask;
@@ -47,14 +47,8 @@ public class BluetoothConnectivityService {
         STATE_CONNECTED
     }
 
-    public BluetoothConnectivityService(OnMessageObservable onMessageObservable) {
+    public BtConnectivityService(OnMessageObservable onMessageObservable) {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (mAdapter != null) {
-            mLocalDeviceUuid = UUID.nameUUIDFromBytes(mAdapter.getName().getBytes());
-        } else {
-            Log.e(TAG, "Device doesn't support Bluetooth?");
-            mLocalDeviceUuid = UUID.randomUUID();
-        }
         mOnMessageObservable = onMessageObservable;
         mState = ConnectionState.IDLE;
     }
@@ -185,10 +179,6 @@ public class BluetoothConnectivityService {
         setState(STATE_LISTEN);
     }
 
-    private void connectionLost() {
-        setState(STATE_LISTEN);
-    }
-
     /**
      * This thread runs while listening for incoming connections. It behaves
      * like a server-side client. It runs until a connection is accepted
@@ -221,7 +211,7 @@ public class BluetoothConnectivityService {
                     break;
                 }
                 if (socket != null) {
-                    synchronized (BluetoothConnectivityService.this) {
+                    synchronized (BtConnectivityService.this) {
                         switch (mState) {
                             case STATE_LISTEN:
                             case STATE_CONNECTING:
@@ -275,6 +265,7 @@ public class BluetoothConnectivityService {
             try {
                 mmSocket.connect();
             } catch (IOException e) {
+                Log.i(TAG, "Trying to connect failed! ", e);
                 connectionFailed();
                 try {
                     mmSocket.close();
@@ -282,10 +273,10 @@ public class BluetoothConnectivityService {
                     Log.e(TAG, "unable to close() socket" +
                             " during connection failure", e2);
                 }
-                BluetoothConnectivityService.this.start();
+                BtConnectivityService.this.start();
                 return;
             }
-            synchronized (BluetoothConnectivityService.this) {
+            synchronized (BtConnectivityService.this) {
                 mCallerTask = null;
             }
             connected(mmSocket, mmDevice);
@@ -334,7 +325,7 @@ public class BluetoothConnectivityService {
                     mOnMessageObservable.onReceiveMsg(buffer, bytes);
                 } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
-                    connectionLost();
+                    connectionFailed();
                     break;
                 }
             }
