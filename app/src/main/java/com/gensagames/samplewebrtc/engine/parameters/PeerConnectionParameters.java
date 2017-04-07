@@ -5,10 +5,18 @@ package com.gensagames.samplewebrtc.engine.parameters;
  * GensaGames
  */
 
+import org.webrtc.PeerConnection;
+
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+
 /**
  * Peer connection parameters.
  */
 public class PeerConnectionParameters {
+
+    public final List<PeerConnection.IceServer> iceServers = new LinkedList<>();
     public final boolean videoCallEnabled;
     public final boolean loopback;
     public final boolean tracing;
@@ -28,7 +36,7 @@ public class PeerConnectionParameters {
     public final boolean disableBuiltInAGC;
     public final boolean disableBuiltInNS;
     public final boolean enableLevelControl;
-    private final DataChannelParameters dataChannelParameters;
+    public final DataChannelParameters dataChannelParameters;
 
     public PeerConnectionParameters(boolean videoCallEnabled, boolean loopback, boolean tracing,
                                     int videoWidth, int videoHeight, int videoFps, int videoMaxBitrate, String videoCodec,
@@ -36,18 +44,21 @@ public class PeerConnectionParameters {
                                     String audioCodec, boolean noAudioProcessing, boolean aecDump, boolean useOpenSLES,
                                     boolean disableBuiltInAEC, boolean disableBuiltInAGC, boolean disableBuiltInNS,
                                     boolean enableLevelControl) {
-        this(videoCallEnabled, loopback, tracing, videoWidth, videoHeight, videoFps, videoMaxBitrate,
+        this(videoCallEnabled, null, loopback, tracing, videoWidth, videoHeight, videoFps, videoMaxBitrate,
                 videoCodec, videoCodecHwAcceleration, videoFlexfecEnabled, audioStartBitrate, audioCodec,
                 noAudioProcessing, aecDump, useOpenSLES, disableBuiltInAEC, disableBuiltInAGC,
                 disableBuiltInNS, enableLevelControl, null);
     }
 
-    public PeerConnectionParameters(boolean videoCallEnabled, boolean loopback, boolean tracing,
+    public PeerConnectionParameters(boolean videoCallEnabled, List<PeerConnection.IceServer> iceServers, boolean loopback, boolean tracing,
                                     int videoWidth, int videoHeight, int videoFps, int videoMaxBitrate, String videoCodec,
                                     boolean videoCodecHwAcceleration, boolean videoFlexfecEnabled, int audioStartBitrate,
                                     String audioCodec, boolean noAudioProcessing, boolean aecDump, boolean useOpenSLES,
                                     boolean disableBuiltInAEC, boolean disableBuiltInAGC, boolean disableBuiltInNS,
                                     boolean enableLevelControl, DataChannelParameters dataChannelParameters) {
+        if (iceServers != null) {
+            this.iceServers.addAll(iceServers);
+        }
         this.videoCallEnabled = videoCallEnabled;
         this.loopback = loopback;
         this.tracing = tracing;
@@ -68,5 +79,12 @@ public class PeerConnectionParameters {
         this.disableBuiltInNS = disableBuiltInNS;
         this.enableLevelControl = enableLevelControl;
         this.dataChannelParameters = dataChannelParameters;
+    }
+
+    public static PeerConnectionParameters getDefaultAudioOnly () {
+        return new PeerConnectionParameters(false, null, false, true, Configs.HD_VIDEO_WIDTH,
+                Configs.HD_VIDEO_HEIGHT, Configs.DEFAULT_FPS, Configs.DEFAULT_VIDEO_BITRATE,
+                Configs.CODEC_DEFAULT, true, true, Configs.AUDIO_START_BITRATE, Configs.CODEC_DEFAULT,
+                false, true, false, false, false, false, false, DataChannelParameters.getDefault());
     }
 }

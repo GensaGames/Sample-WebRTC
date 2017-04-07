@@ -8,17 +8,18 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
+import com.gensagames.samplewebrtc.engine.parameters.PeerConnectionParameters;
 import com.gensagames.samplewebrtc.model.BtDeviceItem;
 import com.gensagames.samplewebrtc.signaling.BtConnectivityDispatcher;
 
-import java.util.Random;
+import org.webrtc.PeerConnectionFactory;
 
 /**
  * Created by GensaGames
  * GensaGames
  */
 
-public class VoIPEngineService extends Service {
+public class VoIPEngineService extends Service implements WebRTCClient.OnPeerCreationListener {
 
     private static final String TAG = VoIPEngineService.class.getSimpleName();
 
@@ -34,6 +35,10 @@ public class VoIPEngineService extends Service {
         super.onCreate();
         mLocalHandler = new Handler();
         mBtConnectivityDispatcher = new BtConnectivityDispatcher();
+
+        WebRTCClient.getInstance().createPeerFactory(getApplicationContext(),
+                new PeerConnectionFactory.Options(), PeerConnectionParameters
+                        .getDefaultAudioOnly(), null);
     }
 
     @Nullable
@@ -60,19 +65,29 @@ public class VoIPEngineService extends Service {
         return START_STICKY ;
     }
 
+    private void startWork () {
+        WebRTCClient client = WebRTCClient.getInstance();
+        if (client.isCreated()) {
+            client.createPeerConnection(this);
+        }
+    }
+
     private void startCall (@NonNull final BtDeviceItem device) {
+        WebRTCClient client = WebRTCClient.getInstance();
+        if (!client.isCreated()) {
+            Log.e(TAG, "PeerFactory not created!");
+            return;
+        }
+        /*  Create connection, and just send raw data, as ping!
+         */
         mBtConnectivityDispatcher.setWorkingAddress(device.getDeviceAddress());
-        mLocalHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                mBtConnectivityDispatcher.sendWhenReady("Hello from device \""
-                        + new Random().nextInt(20) + "\"");
-                mLocalHandler.postDelayed(this, 10000);
-            }
-        });
+        mBtConnectivityDispatcher.sendWhenReady("");
+        client.createPeerConnection(this);
     }
 
 
+    @Override
+    public void onPeerConnectionCreated(PeerConnectionSession session) {
 
-
+    }
 }

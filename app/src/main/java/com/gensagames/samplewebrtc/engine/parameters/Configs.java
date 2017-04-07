@@ -11,6 +11,8 @@ public class Configs {
     public static final String AUDIO_TRACK_ID = "ARDAMSa0";
     public static final String VIDEO_TRACK_TYPE = "video";
     public static final String TAG = "PCRTCClient";
+    public static final int AUDIO_START_BITRATE = 32;
+    public static final String CODEC_DEFAULT = "OPUS";
     public static final String VIDEO_CODEC_VP8 = "VP8";
     public static final String VIDEO_CODEC_VP9 = "VP9";
     public static final String VIDEO_CODEC_H264 = "H264";
@@ -32,5 +34,7 @@ public class Configs {
     public static final String DTLS_SRTP_KEY_AGREEMENT_CONSTRAINT = "DtlsSrtpKeyAgreement";
     public static final int HD_VIDEO_WIDTH = 1280;
     public static final int HD_VIDEO_HEIGHT = 720;
+    public static final int DEFAULT_VIDEO_BITRATE = 1700;
     public static final int BPS_IN_KBPS = 1000;
+    public static final int DEFAULT_FPS = 30;
 }

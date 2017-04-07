@@ -24,4 +24,8 @@ public class DataChannelParameters {
         this.negotiated = negotiated;
         this.id = id;
     }
+
+    public static DataChannelParameters getDefault () {
+        return new DataChannelParameters(true, -1, -1, "", false, 1);
+    }
 }
