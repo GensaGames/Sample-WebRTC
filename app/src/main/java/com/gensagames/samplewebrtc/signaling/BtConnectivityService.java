@@ -7,35 +7,36 @@ import android.bluetooth.BluetoothSocket;
 import android.util.Log;
 
 import com.gensagames.samplewebrtc.signaling.helper.ConnectivityChangeListener;
-import com.gensagames.samplewebrtc.signaling.helper.OnMessageObservable;
+import com.gensagames.samplewebrtc.signaling.helper.MessageObservable;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
 
-import static com.gensagames.samplewebrtc.signaling.BtConnectivityService.ConnectionState.IDLE;
-import static com.gensagames.samplewebrtc.signaling.BtConnectivityService.ConnectionState.STATE_CONNECTED;
-import static com.gensagames.samplewebrtc.signaling.BtConnectivityService.ConnectionState.STATE_CONNECTING;
-import static com.gensagames.samplewebrtc.signaling.BtConnectivityService.ConnectionState.STATE_LISTEN;
+import static com.gensagames.samplewebrtc.signaling.BTConnectivityService.ConnectionState.IDLE;
+import static com.gensagames.samplewebrtc.signaling.BTConnectivityService.ConnectionState.STATE_CONNECTED;
+import static com.gensagames.samplewebrtc.signaling.BTConnectivityService.ConnectionState.STATE_CONNECTING;
+import static com.gensagames.samplewebrtc.signaling.BTConnectivityService.ConnectionState.STATE_LISTEN;
 
 /**
  * Created by GensaGames
  * GensaGames
  */
 
-public class BtConnectivityService {
+public class BTConnectivityService {
 
-    private static final String TAG = BtConnectivityService.class.getSimpleName();
-    private static final String SERVICE_NAME = BtConnectivityService.class.getSimpleName();
+    private static final String TAG = BTConnectivityService.class.getSimpleName();
+    private static final String SERVICE_NAME = BTConnectivityService.class.getSimpleName();
 
     private final BluetoothAdapter mAdapter;
-    private final OnMessageObservable mOnMessageObservable;
-    private final UUID mLocalDeviceUuid = UUID.nameUUIDFromBytes(SERVICE_NAME.getBytes());
+    private final MessageObservable mMessageObservable;
+    private final UUID mMainAppUuid = UUID.nameUUIDFromBytes(SERVICE_NAME.getBytes());
     private ConnectivityChangeListener mConnectivityChangeListener;
 
     private CalleeTask mCalleeTask;
     private CallerTask mCallerTask;
+    private BluetoothDevice mWorkingDevice;
     private MainSignalingTask mMainSignalingTask;
     private ConnectionState mState;
 
@@ -47,9 +48,9 @@ public class BtConnectivityService {
         STATE_CONNECTED
     }
 
-    public BtConnectivityService(OnMessageObservable onMessageObservable) {
+    public BTConnectivityService(MessageObservable messageObservable) {
         mAdapter = BluetoothAdapter.getDefaultAdapter();
-        mOnMessageObservable = onMessageObservable;
+        mMessageObservable = messageObservable;
         mState = ConnectionState.IDLE;
     }
 
@@ -59,6 +60,14 @@ public class BtConnectivityService {
         if (mConnectivityChangeListener != null) {
             mConnectivityChangeListener.onConnectivityStateChanged(state);
         }
+    }
+
+    public BluetoothDevice getWorkingDevice() {
+        return mWorkingDevice;
+    }
+
+    public void setWorkingDevice(BluetoothDevice mWorkingDevice) {
+        this.mWorkingDevice = mWorkingDevice;
     }
 
     public synchronized ConnectionState getState() {
@@ -73,6 +82,10 @@ public class BtConnectivityService {
      * Start the chat service. Specifically start CalleeTask to begin a
      * session in listening (server) mode. Called by the Activity onResume() */
     public synchronized void start() {
+        if (mAdapter == null || !mAdapter.isEnabled()) {
+            Log.e(TAG, "Cannot start service!");
+            return;
+        }
         Log.d(TAG, "start");
         if (mCallerTask != null) {
             mCallerTask.cancel();
@@ -105,6 +118,7 @@ public class BtConnectivityService {
             mMainSignalingTask = null;
         }
         // Start the thread to connect with the given device
+        mWorkingDevice = device;
         mCallerTask = new CallerTask(device);
         mCallerTask.start();
         setState(STATE_CONNECTING);
@@ -176,6 +190,7 @@ public class BtConnectivityService {
     }
 
     private void connectionFailed() {
+        mWorkingDevice = null;
         setState(STATE_LISTEN);
     }
 
@@ -190,7 +205,7 @@ public class BtConnectivityService {
         private CalleeTask() {
             BluetoothServerSocket tmp = null;
             try {
-                tmp = mAdapter.listenUsingRfcommWithServiceRecord(SERVICE_NAME, mLocalDeviceUuid);
+                tmp = mAdapter.listenUsingRfcommWithServiceRecord(SERVICE_NAME, mMainAppUuid);
             } catch (IOException e) {
                 Log.e(TAG, "listen() failed", e);
             }
@@ -211,11 +226,12 @@ public class BtConnectivityService {
                     break;
                 }
                 if (socket != null) {
-                    synchronized (BtConnectivityService.this) {
+                    synchronized (BTConnectivityService.this) {
                         switch (mState) {
                             case STATE_LISTEN:
                             case STATE_CONNECTING:
-                                connected(socket, socket.getRemoteDevice());
+                                mWorkingDevice = socket.getRemoteDevice();
+                                connected(socket, mWorkingDevice);
                                 break;
                             case IDLE:
                             case STATE_CONNECTED:
@@ -253,7 +269,7 @@ public class BtConnectivityService {
             mmDevice = device;
             BluetoothSocket tmp = null;
             try {
-                tmp = device.createRfcommSocketToServiceRecord(mLocalDeviceUuid);
+                tmp = device.createRfcommSocketToServiceRecord(mMainAppUuid);
             } catch (IOException e) {
                 Log.e(TAG, "create() failed", e);
             }
@@ -273,10 +289,10 @@ public class BtConnectivityService {
                     Log.e(TAG, "unable to close() socket" +
                             " during connection failure", e2);
                 }
-                BtConnectivityService.this.start();
+                BTConnectivityService.this.start();
                 return;
             }
-            synchronized (BtConnectivityService.this) {
+            synchronized (BTConnectivityService.this) {
                 mCallerTask = null;
             }
             connected(mmSocket, mmDevice);
@@ -322,7 +338,7 @@ public class BtConnectivityService {
             while (true) {
                 try {
                     bytes = mmInStream.read(buffer);
-                    mOnMessageObservable.onReceiveMsg(buffer, bytes);
+                    mMessageObservable.onReceiveMsg(buffer, bytes);
                 } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
                     connectionFailed();
@@ -337,7 +353,7 @@ public class BtConnectivityService {
         public void write(byte[] buffer) {
             try {
                 mmOutStream.write(buffer);
-                mOnMessageObservable.onSentMsg(buffer);
+                mMessageObservable.onSentMsg(buffer);
             } catch (IOException e) {
                 Log.e(TAG, "Exception during write", e);
             }

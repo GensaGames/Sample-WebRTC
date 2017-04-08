@@ -14,6 +14,7 @@ import java.util.List;
 /**
  * Peer connection parameters.
  */
+@SuppressWarnings("WeakerAccess")
 public class PeerConnectionParameters {
 
     public final List<PeerConnection.IceServer> iceServers = new LinkedList<>();
@@ -82,7 +83,9 @@ public class PeerConnectionParameters {
     }
 
     public static PeerConnectionParameters getDefaultAudioOnly () {
-        return new PeerConnectionParameters(false, null, false, true, Configs.HD_VIDEO_WIDTH,
+        List<PeerConnection.IceServer> iceServers = new ArrayList<>();
+        iceServers.add(new PeerConnection.IceServer(Configs.GOOGLE_STUN_URI));
+        return new PeerConnectionParameters(false, iceServers, false, true, Configs.HD_VIDEO_WIDTH,
                 Configs.HD_VIDEO_HEIGHT, Configs.DEFAULT_FPS, Configs.DEFAULT_VIDEO_BITRATE,
                 Configs.CODEC_DEFAULT, true, true, Configs.AUDIO_START_BITRATE, Configs.CODEC_DEFAULT,
                 false, true, false, false, false, false, false, DataChannelParameters.getDefault());

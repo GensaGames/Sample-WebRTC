@@ -22,10 +22,10 @@ import android.view.ViewGroup;
 
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
-import com.gensagames.samplewebrtc.signaling.BluetoothMonitorController;
+import com.gensagames.samplewebrtc.controller.BTMonitorController;
 import com.gensagames.samplewebrtc.controller.BtRecyclerAdapter;
 import com.gensagames.samplewebrtc.signaling.helper.OnBluetoothResponse;
-import com.gensagames.samplewebrtc.model.BtDeviceItem;
+import com.gensagames.samplewebrtc.model.BTDeviceItem;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
 
 public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnRefreshListener,
@@ -38,7 +38,7 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     private SwipeRefreshLayout mSwipeRefreshLayout;
 
     private BtRecyclerAdapter mBtRecyclerAdapter;
-    private BluetoothMonitorController mBluetoothMonitorController;
+    private BTMonitorController mBluetoothMonitorController;
 
     @Override
     @SuppressLint("InflateParams")
@@ -55,7 +55,7 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
         super.onViewCreated(view, savedInstanceState);
         setupAdapter();
 
-        mBluetoothMonitorController = new BluetoothMonitorController(this);
+        mBluetoothMonitorController = new BTMonitorController(this);
         mBluetoothMonitorController.registerMonitor(getActivity());
     }
 
@@ -86,7 +86,7 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     @Override
     public void onItemClick(int position) {
         Log.d(TAG, "OnItemClick..");
-        BtDeviceItem item = mBtRecyclerAdapter
+        BTDeviceItem item = mBtRecyclerAdapter
                 .getWorkingItems().get(position);
         getDialogForSignalingCall(getString(R.string.dialog_tittle_make_call), getString(R
                 .string.dialog_msg_make_call, item.getDeviceName()), item)
@@ -113,8 +113,8 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
 
     @Override
     public void onDiscovery(@NonNull BluetoothDevice device) {
-        mBtRecyclerAdapter.getWorkingItems().add(new BtDeviceItem(device,
-                getString(R.string.name_unknown)));
+        mBtRecyclerAdapter.getWorkingItems().add(BTDeviceItem.
+                createFromBT(device, getString(R.string.name_unknown)));
         mBtRecyclerAdapter.notifyDataSetChanged();
 
     }
@@ -132,18 +132,18 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
         mBtRecyclerAdapter.notifyDataSetChanged();
     }
 
-    private void startSignalingCall (@NonNull BtDeviceItem device) {
+    private void startSignalingCall (@NonNull BTDeviceItem device) {
         Log.d(TAG, "startSignalingCall to Device: " + device.getDeviceName());
         mBluetoothMonitorController.cancelSearch();
         Activity activityContext = getActivity();
         Intent intent = new Intent(VoIPEngineService.ACTION_START_CALL, Uri.EMPTY,
                 activityContext, VoIPEngineService.class);
-        intent.putExtra(VoIPEngineService.EXTRA_START_CALL, device);
+        intent.putExtra(VoIPEngineService.EXTRA_DEVICE_ITEM, device);
         activityContext.startService(intent);
     }
 
     private AlertDialog getDialogForSignalingCall (String tittle, String msg,
-                                                   final BtDeviceItem item) {
+                                                   final BTDeviceItem item) {
         return new AlertDialog.Builder(getActivity())
                 .setTitle(tittle)
                 .setMessage(msg)

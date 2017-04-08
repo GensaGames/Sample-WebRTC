@@ -1,8 +1,12 @@
 package com.gensagames.samplewebrtc.model;
 
 import android.bluetooth.BluetoothDevice;
+import android.content.Context;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.text.TextUtils;
+
+import com.gensagames.samplewebrtc.R;
 
 import java.io.Serializable;
 
@@ -11,19 +15,18 @@ import java.io.Serializable;
  * GensaGames
  */
 
-public class BtDeviceItem implements Serializable {
+public class BTDeviceItem implements Serializable {
     private String deviceName;
+    private String defaultName;
     private String deviceAddress;
 
-    public BtDeviceItem(@NonNull BluetoothDevice device) {
+    public BTDeviceItem(@NonNull BluetoothDevice device,
+                        @Nullable String defaultName) {
         this.deviceName = device.getName();
         this.deviceAddress = device.getAddress();
-    }
-    public BtDeviceItem(@NonNull BluetoothDevice device,
-                        @NonNull String defaultName) {
-        this(device);
+
         if (TextUtils.isEmpty(deviceName)) {
-            deviceName = defaultName;
+            this.defaultName = defaultName;
         }
     }
 
@@ -33,6 +36,10 @@ public class BtDeviceItem implements Serializable {
 
     public String getDeviceAddress() {
         return deviceAddress;
+    }
+
+    public static BTDeviceItem createFromBT (BluetoothDevice device, String defaultName) {
+        return new BTDeviceItem(device, defaultName);
     }
 
 }

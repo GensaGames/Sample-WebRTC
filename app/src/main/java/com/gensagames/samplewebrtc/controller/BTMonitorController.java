@@ -1,4 +1,4 @@
-package com.gensagames.samplewebrtc.signaling;
+package com.gensagames.samplewebrtc.controller;
 
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
@@ -18,9 +18,9 @@ import com.gensagames.samplewebrtc.signaling.helper.OnBluetoothResponse;
  * GensaGames
  */
 
-public class BluetoothMonitorController {
+public class BTMonitorController {
 
-    private static final String TAG = BluetoothMonitorController.class.getSimpleName();
+    private static final String TAG = BTMonitorController.class.getSimpleName();
 
     private static final int REQUEST_BLUETOOTH = 707;
     private static final long KEEP_SEARCH_ALIVE = java.util.concurrent.
@@ -30,7 +30,7 @@ public class BluetoothMonitorController {
     private BluetoothAdapter mBluetoothAdapter;
     private OnBluetoothResponse mOnBluetoothResponse;
 
-    public BluetoothMonitorController(OnBluetoothResponse onBluetoothResponse) {
+    public BTMonitorController(OnBluetoothResponse onBluetoothResponse) {
         mOnBluetoothResponse = onBluetoothResponse;
         mLocalUiHandler = new Handler(Looper.getMainLooper());
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();

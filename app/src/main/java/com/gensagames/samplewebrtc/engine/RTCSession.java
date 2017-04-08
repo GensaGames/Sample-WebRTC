@@ -3,7 +3,9 @@ package com.gensagames.samplewebrtc.engine;
 import android.support.annotation.Nullable;
 import android.util.Log;
 
+import com.gensagames.samplewebrtc.engine.parameters.Configs;
 import com.gensagames.samplewebrtc.engine.parameters.PeerConnectionParameters;
+import com.gensagames.samplewebrtc.engine.utils.SdpConfig;
 
 import org.webrtc.AudioTrack;
 import org.webrtc.DataChannel;
@@ -26,9 +28,9 @@ import static com.gensagames.samplewebrtc.engine.utils.SdpConfig.preferCodec;
  * GensaGames
  */
 
-public class PeerConnectionSession implements PeerConnection.Observer {
+public class RTCSession implements PeerConnection.Observer {
 
-    private static final String TAG = PeerConnectionSession.class.getSimpleName();
+    private static final String TAG = RTCSession.class.getSimpleName();
     private PeerConnectionParameters peerConnectionParameters;
     private PeerConnection mPeerConnection;
     private PeerSdpObserver mSdpObserver;
@@ -38,6 +40,7 @@ public class PeerConnectionSession implements PeerConnection.Observer {
     private VideoTrack mVideoTrack;
 
     private Executor mWorkingExecutor;
+    private PeerConnection.IceConnectionState mIceConnectionState;
     private PeerEventsListener mPeerEventsListener;
     private SessionDescription mWorkingSdp;
     private long mSessionId;
@@ -50,7 +53,9 @@ public class PeerConnectionSession implements PeerConnection.Observer {
         /**
          * Callback fired once local SDP is created and set.
          */
-        void onLocalDescription(final SessionDescription sdp);
+        void onOfferDescriptionSet(final SessionDescription sdp);
+
+        void onRemoteDescriptionSet(final SessionDescription sdp);
 
         /**
          * Callback fired once local Ice candidate is generated.
@@ -90,21 +95,29 @@ public class PeerConnectionSession implements PeerConnection.Observer {
         void onPeerConnectionError(final String description);
     }
 
-    protected PeerConnectionSession () {
+    protected RTCSession() {
         mSdpObserver = new PeerSdpObserver();
         mSessionId = UUID.randomUUID().getMostSignificantBits();
-        mWorkingExecutor = WebRTCClient.getInstance().getExecutor();
-        peerConnectionParameters = WebRTCClient.getInstance()
+        mWorkingExecutor = VoIPRTCClient.getInstance().getExecutor();
+        peerConnectionParameters = VoIPRTCClient.getInstance()
                 .getPeerConnectionParameters();
     }
 
-    protected PeerConnectionSession configure(PeerConnection peerConnection, @Nullable DataChannel dataChannel,
-                                              AudioTrack audioTrack, @Nullable VideoTrack videoTrack) {
+    protected RTCSession configure(PeerConnection peerConnection, @Nullable DataChannel dataChannel,
+                                   AudioTrack audioTrack, @Nullable VideoTrack videoTrack) {
         mPeerConnection = peerConnection;
         mDataChannel = dataChannel;
         mAudioTrack = audioTrack;
         mVideoTrack = videoTrack;
         return this;
+    }
+
+    public PeerConnection.IceConnectionState getIceConnectionState() {
+        return mIceConnectionState;
+    }
+
+    public SessionDescription getWorkingSdp() {
+        return mWorkingSdp;
     }
 
     public long getSessionId () {
@@ -119,8 +132,43 @@ public class PeerConnectionSession implements PeerConnection.Observer {
         mWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
+                isInitiator = true;
                 mPeerConnection.createOffer(mSdpObserver,
-                        WebRTCClient.getInstance().getSdpConstraints());
+                        VoIPRTCClient.getInstance().getSdpConstraints());
+            }
+        });
+    }
+
+
+    public void createAnswer() {
+        mWorkingExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                isInitiator = false;
+                mPeerConnection.createAnswer(mSdpObserver,
+                        VoIPRTCClient.getInstance().getSdpConstraints());
+            }
+        });
+    }
+
+    public void setRemoteDescription (final SessionDescription sessionDescription) {
+        mWorkingExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "setRemoteDescription...");
+                String sdpDescription = sessionDescription.description;
+
+                if (peerConnectionParameters.videoCallEnabled) {
+                    sdpDescription = preferCodec(sdpDescription,
+                            peerConnectionParameters.videoCodec, false);
+                }
+                if (peerConnectionParameters.audioStartBitrate > 0) {
+                    sdpDescription = SdpConfig.setStartBitrate(Configs.AUDIO_CODEC_OPUS,
+                            false, sdpDescription, peerConnectionParameters.audioStartBitrate);
+                }
+                SessionDescription sdpRemote = new SessionDescription
+                        (sessionDescription.type, sdpDescription);
+                mPeerConnection.setRemoteDescription(mSdpObserver, sdpRemote);
             }
         });
     }
@@ -135,56 +183,76 @@ public class PeerConnectionSession implements PeerConnection.Observer {
 
     @Override
     public void onSignalingChange(PeerConnection.SignalingState signalingState) {
+        Log.d(TAG, "PeerConnection.SignalingState: " + signalingState);
 
     }
 
     @Override
-    public void onIceConnectionChange(PeerConnection.IceConnectionState iceConnectionState) {
-
+    public void onIceConnectionChange(final PeerConnection.IceConnectionState iceConnectionState) {
+        mWorkingExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "IceConnectionState: " + iceConnectionState);
+                mIceConnectionState = iceConnectionState;
+                switch (iceConnectionState) {
+                    case CONNECTED:
+                        mPeerEventsListener.onIceConnected();
+                        break;
+                    case FAILED:
+                    case DISCONNECTED:
+                        mPeerEventsListener.onIceDisconnected();
+                        break;
+                }
+            }
+        });
     }
 
     @Override
     public void onIceConnectionReceivingChange(boolean b) {
+        Log.d(TAG, "onIceConnectionReceivingChange: " + b);
 
     }
 
     @Override
     public void onIceGatheringChange(PeerConnection.IceGatheringState iceGatheringState) {
+        Log.d(TAG, "onIceGatheringChange: " + iceGatheringState);
 
     }
 
     @Override
     public void onIceCandidate(IceCandidate iceCandidate) {
-
+        Log.d(TAG, "onIceCandidate: " + iceCandidate);
     }
 
     @Override
     public void onIceCandidatesRemoved(IceCandidate[] iceCandidates) {
-
+        Log.d(TAG, "onIceCandidatesRemoved");
     }
 
     @Override
     public void onAddStream(MediaStream mediaStream) {
-
+        Log.d(TAG, "onAddStream");
     }
 
     @Override
     public void onRemoveStream(MediaStream mediaStream) {
-
+        Log.d(TAG, "onRemoveStream");
     }
 
     @Override
     public void onDataChannel(DataChannel dataChannel) {
-
+        Log.d(TAG, "onDataChannel");
     }
 
     @Override
     public void onRenegotiationNeeded() {
+        Log.d(TAG, "onRenegotiationNeeded");
 
     }
 
     @Override
     public void onAddTrack(RtpReceiver rtpReceiver, MediaStream[] mediaStreams) {
+        Log.d(TAG, "onAddTrack");
 
     }
 
@@ -196,18 +264,19 @@ public class PeerConnectionSession implements PeerConnection.Observer {
          * @param sessionDescription
          */
         @Override
-        public void onCreateSuccess(SessionDescription sessionDescription) {
-            Log.d(TAG, "onCreateSuccess SDP: " + sessionDescription.description);
-            String sdpDescription = sessionDescription.description;
-            if (peerConnectionParameters.videoCallEnabled) {
-                sdpDescription = preferCodec(sdpDescription,
-                        peerConnectionParameters.videoCodec, false);
-            }
-            mWorkingSdp = new SessionDescription
-                    (sessionDescription.type, sdpDescription);
+        public void onCreateSuccess(final SessionDescription sessionDescription) {
             mWorkingExecutor.execute(new Runnable() {
                 @Override
                 public void run() {
+                    Log.d(TAG, "onCreateSuccess SDP:\n" +  sessionDescription.description);
+                    String sdpDescription = sessionDescription.description;
+                    if (peerConnectionParameters.videoCallEnabled) {
+                        sdpDescription = preferCodec(sdpDescription,
+                                peerConnectionParameters.videoCodec, false);
+                    }
+                    mWorkingSdp = new SessionDescription
+                            (sessionDescription.type, sdpDescription);
+
                     mPeerConnection.setLocalDescription
                             (PeerSdpObserver.this, mWorkingSdp);
                 }
@@ -219,22 +288,27 @@ public class PeerConnectionSession implements PeerConnection.Observer {
          */
         @Override
         public void onSetSuccess() {
+            mWorkingExecutor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    if (isInitiator) {
+                        if (mPeerConnection.getRemoteDescription() == null) {
+                            mPeerEventsListener.onOfferDescriptionSet(mWorkingSdp);
+                        } else {
+                            drainCandidates();
+                        }
+                    } else {
+                        if (mPeerConnection.getLocalDescription() != null) {
+                            mPeerEventsListener.onRemoteDescriptionSet(mWorkingSdp);
+                            drainCandidates();
+                        } else {
+                            Log.d(TAG, "Remote SDP set successfully!");
+                        }
+                    }
+                }
+            });
             Log.d(TAG, "onSetSuccess");
-            if (isInitiator) {
-                if (mPeerConnection.getRemoteDescription() == null) {
-                    mPeerEventsListener.onLocalDescription(mWorkingSdp);
-                } else {
-                    drainCandidates();
-                }
-            } else {
-                if (mPeerConnection.getLocalDescription() != null) {
-                    mPeerEventsListener.onLocalDescription(mWorkingSdp);
-                    drainCandidates();
-                } else {
-                    Log.d(TAG, "Remote SDP set succesfully. " +
-                            "Should work now!");
-                }
-            }
+
         }
 
         @Override

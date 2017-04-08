@@ -9,11 +9,14 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.gensagames.samplewebrtc.engine.parameters.Configs.*;
+
 /**
  * Created by GensaGames
  * GensaGames
  */
 
+@SuppressWarnings("WeakerAccess")
 public class SdpConfig {
 
     private static final String TAG = SdpConfig.class.getSimpleName();
@@ -44,7 +47,7 @@ public class SdpConfig {
         }
         // A list with all the payload types with name |codec|. The payload types are integers in the
         // range 96-127, but they are stored as strings here.
-        final List<String> codecPayloadTypes = new ArrayList<String>();
+        final List<String> codecPayloadTypes = new ArrayList<>();
         // a=rtpmap:<payload type> <encoding name>/<clock rate> [/<encoding parameters>]
         final Pattern codecPattern = Pattern.compile("^a=rtpmap:(\\d+) " + codec + "(/\\d+)+[\r]?$");
         for (int i = 0; i < lines.length; ++i) {
@@ -77,11 +80,11 @@ public class SdpConfig {
         }
         final List<String> header = origLineParts.subList(0, 3);
         final List<String> unpreferredPayloadTypes =
-                new ArrayList<String>(origLineParts.subList(3, origLineParts.size()));
+                new ArrayList<>(origLineParts.subList(3, origLineParts.size()));
         unpreferredPayloadTypes.removeAll(preferredPayloadTypes);
         // Reconstruct the line with |preferredPayloadTypes| moved to the beginning of the payload
         // types.
-        final List<String> newLineParts = new ArrayList<String>();
+        final List<String> newLineParts = new ArrayList<>();
         newLineParts.addAll(header);
         newLineParts.addAll(preferredPayloadTypes);
         newLineParts.addAll(unpreferredPayloadTypes);
@@ -102,6 +105,70 @@ public class SdpConfig {
             buffer.append(delimiter);
         }
         return buffer.toString();
+    }
+
+
+    public static String setStartBitrate(
+            String codec, boolean isVideoCodec, String sdpDescription, int bitrateKbps) {
+        String[] lines = sdpDescription.split("\r\n");
+        int rtpmapLineIndex = -1;
+        boolean sdpFormatUpdated = false;
+        String codecRtpMap = null;
+        // Search for codec rtpmap in format
+        // a=rtpmap:<payload type> <encoding name>/<clock rate> [/<encoding parameters>]
+        String regex = "^a=rtpmap:(\\d+) " + codec + "(/\\d+)+[\r]?$";
+        Pattern codecPattern = Pattern.compile(regex);
+        for (int i = 0; i < lines.length; i++) {
+            Matcher codecMatcher = codecPattern.matcher(lines[i]);
+            if (codecMatcher.matches()) {
+                codecRtpMap = codecMatcher.group(1);
+                rtpmapLineIndex = i;
+                break;
+            }
+        }
+        if (codecRtpMap == null) {
+            Log.w(TAG, "No rtpmap for " + codec + " codec");
+            return sdpDescription;
+        }
+        Log.d(TAG, "Found " + codec + " rtpmap " + codecRtpMap + " at " + lines[rtpmapLineIndex]);
+
+        // Check if a=fmtp string already exist in remote SDP for this codec and
+        // update it with new bitrate parameter.
+        regex = "^a=fmtp:" + codecRtpMap + " \\w+=\\d+.*[\r]?$";
+        codecPattern = Pattern.compile(regex);
+        for (int i = 0; i < lines.length; i++) {
+            Matcher codecMatcher = codecPattern.matcher(lines[i]);
+            if (codecMatcher.matches()) {
+                Log.d(TAG, "Found " + codec + " " + lines[i]);
+                if (isVideoCodec) {
+                    lines[i] += "; " + VIDEO_CODEC_PARAM_START_BITRATE + "=" + bitrateKbps;
+                } else {
+                    lines[i] += "; " + AUDIO_CODEC_PARAM_BITRATE + "=" + (bitrateKbps * 1000);
+                }
+                Log.d(TAG, "Update remote SDP line: " + lines[i]);
+                sdpFormatUpdated = true;
+                break;
+            }
+        }
+
+        StringBuilder newSdpDescription = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            newSdpDescription.append(lines[i]).append("\r\n");
+            // Append new a=fmtp line if no such line exist for a codec.
+            if (!sdpFormatUpdated && i == rtpmapLineIndex) {
+                String bitrateSet;
+                if (isVideoCodec) {
+                    bitrateSet =
+                            "a=fmtp:" + codecRtpMap + " " + VIDEO_CODEC_PARAM_START_BITRATE + "=" + bitrateKbps;
+                } else {
+                    bitrateSet = "a=fmtp:" + codecRtpMap + " " + AUDIO_CODEC_PARAM_BITRATE + "="
+                            + (bitrateKbps * 1000);
+                }
+                Log.d(TAG, "Add remote SDP line: " + bitrateSet);
+                newSdpDescription.append(bitrateSet).append("\r\n");
+            }
+        }
+        return newSdpDescription.toString();
     }
 
 }

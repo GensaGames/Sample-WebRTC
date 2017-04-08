@@ -8,7 +8,7 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.gensagames.samplewebrtc.R;
-import com.gensagames.samplewebrtc.model.BtDeviceItem;
+import com.gensagames.samplewebrtc.model.BTDeviceItem;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,7 +25,7 @@ public class BtRecyclerAdapter extends RecyclerView.Adapter
         void onItemClick(int position);
     }
 
-    private List<BtDeviceItem> mBtDeviceItemList;
+    private List<BTDeviceItem> mBtDeviceItemList;
     private OnItemClickListener mOnItemClickListener;
 
     public BtRecyclerAdapter() {
@@ -52,7 +52,7 @@ public class BtRecyclerAdapter extends RecyclerView.Adapter
         return mBtDeviceItemList.size();
     }
 
-    public List<BtDeviceItem> getWorkingItems () {
+    public List<BTDeviceItem> getWorkingItems () {
         return mBtDeviceItemList;
     }
 
@@ -78,7 +78,7 @@ public class BtRecyclerAdapter extends RecyclerView.Adapter
             deviceInfo = (TextView) itemView.findViewById(R.id.adapterDeviceInfo);
         }
 
-        public void bind (BtDeviceItem item) {
+        public void bind (BTDeviceItem item) {
             String deviceNameString = TextUtils.isEmpty(item.getDeviceName()) ?
                     deviceName.getContext().getString(R.string.name_unknown) : item.getDeviceName();
 

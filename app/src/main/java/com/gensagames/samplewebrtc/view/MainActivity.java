@@ -1,6 +1,9 @@
 package com.gensagames.samplewebrtc.view;
 
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -15,6 +18,7 @@ import android.view.MenuItem;
 import android.view.View;
 
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
+import com.gensagames.samplewebrtc.model.RTCMessageItem;
 import com.gensagames.samplewebrtc.view.fragments.MainSliderFragment;
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.view.fragments.AboutFragment;
@@ -28,33 +32,50 @@ public class MainActivity extends AppCompatActivity {
     private FragmentManager mFragmentManager;
     private CoordinatorLayout mCoordinatorLayout;
 
+    private IncomingCallReceiver mIncomingCallReceiver;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        setNavigationDrawer();
+
         startService(new Intent(VoIPEngineService.ACTION_IDLE, Uri.EMPTY,
                 getApplicationContext(), VoIPEngineService.class));
+        registerVoIPReceiver();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(mIncomingCallReceiver);
+    }
+
+    private void registerVoIPReceiver () {
+        mIncomingCallReceiver = new IncomingCallReceiver();
+        IntentFilter intentFilter = new IntentFilter(VoIPEngineService.ANNOUNCE_INCOMING_CALL);
+        registerReceiver(mIncomingCallReceiver, intentFilter);
+    }
+
+    private void handleIncomingCall(RTCMessageItem item) {
 
         /**
-         *Setup the DrawerLayout and NavigationView
+         * TODO(UI) After some actions
          */
+        Intent intent = new Intent(VoIPEngineService.ACTION_ANSWER_CALL, Uri.EMPTY,
+                this, VoIPEngineService.class);
+        intent.putExtra(VoIPEngineService.EXTRA_RTC_ITEM, item);
+        startService(intent);
+    }
 
+    private void setNavigationDrawer () {
         mHeaderInstanceView = findViewById(R.id.headerContainer);
         mCoordinatorLayout = (CoordinatorLayout) findViewById(R.id.mainCoordinator);
         mDrawerLayout = (DrawerLayout) findViewById(R.id.mainDrawerLayout);
         mNavigationView = (NavigationView) findViewById(R.id.mainDrawerNavigation);
 
-        /**
-         * Lets inflate the very first fragment
-         * Here , we are inflating the MainSliderFragment as the first Fragment
-         */
-
         mFragmentManager = getSupportFragmentManager();
         makeFragmentTransaction(new MainSliderFragment());
-
-        /**
-         * Setup click events on the Navigation View Items.
-         */
 
         mNavigationView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
             @Override
@@ -115,5 +136,18 @@ public class MainActivity extends AppCompatActivity {
 
         mDrawerLayout.addDrawerListener(mDrawerToggle);
         mDrawerToggle.syncState();
+    }
+
+    private  class IncomingCallReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action.equals(VoIPEngineService.ANNOUNCE_INCOMING_CALL)) {
+                handleIncomingCall((RTCMessageItem) intent
+                        .getSerializableExtra(VoIPEngineService.EXTRA_RTC_ITEM));
+            }
+        }
+
     }
 }
