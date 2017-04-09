@@ -57,19 +57,19 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
 
     private static VoIPRTCClient instance;
 
-    private Executor executor;
-    private PeerConnectionFactory.Options options;
-    private PeerConnectionParameters peerConnectionParameters;
-    private PeerConnectionFactory factory;
+    private Executor mWorkingExecutor;
+    private PeerConnectionFactory.Options mPeerFactoryOptions;
+    private PeerConnectionParameters mPeerConnectionParameters;
+    private PeerConnectionFactory mPeerFactory;
 
-    private MediaConstraints pcConstraints;
-    private MediaConstraints audioConstraints;
-    private MediaConstraints sdpMediaConstraints;
+    private MediaConstraints mPeerConstraints;
+    private MediaConstraints mAudioConstraints;
+    private MediaConstraints mSdpMediaConstraints;
 
-    private ParcelFileDescriptor aecDumpFileDescriptor;
-    private MediaStream mediaStream;
-    private AudioSource audioSource;
-    private VideoSource videoSource;
+    private ParcelFileDescriptor mAecDumpFileDescriptor;
+    private MediaStream mMediaStream;
+    private AudioSource mAudioSource;
+    private VideoSource mVideoSource;
 
     public interface FactoryCreationListener {
         void onCreationDone (boolean isSuccessful);
@@ -80,7 +80,7 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
     }
 
     private VoIPRTCClient() {
-        executor = Executors.newSingleThreadScheduledExecutor();
+        mWorkingExecutor = Executors.newSingleThreadScheduledExecutor();
     }
 
     public static VoIPRTCClient getInstance() {
@@ -95,28 +95,28 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
     }
 
     public boolean isCreated () {
-        return factory != null;
+        return mPeerFactory != null;
     }
 
     public Executor getExecutor () {
-        return executor;
+        return mWorkingExecutor;
     }
 
     public PeerConnectionParameters getPeerConnectionParameters () {
-        return peerConnectionParameters;
+        return mPeerConnectionParameters;
     }
 
     public MediaConstraints getSdpConstraints() {
-        return sdpMediaConstraints;
+        return mSdpMediaConstraints;
     }
 
     public void createPeerFactory(@NonNull final Context context,
                                   @NonNull PeerConnectionFactory.Options options,
                                   @NonNull PeerConnectionParameters peerConnectionParameters,
                                   @Nullable final FactoryCreationListener factoryCreationListener) {
-        this.peerConnectionParameters = peerConnectionParameters;
-        this.options = options;
-        executor.execute(new Runnable() {
+        this.mPeerConnectionParameters = peerConnectionParameters;
+        this.mPeerFactoryOptions = options;
+        mWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 createPeerFactoryInternal(context, factoryCreationListener);
@@ -136,7 +136,7 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
                                       @Nullable final VideoCapturer videoCapturer,
                                       @Nullable final VideoRenderer.Callbacks videoCallbackLocal,
                                       @Nullable final List<VideoRenderer.Callbacks> videoCallbacksRemote) {
-        executor.execute(new Runnable() {
+        mWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 createPeerConnectionInternal(peerCreationListener, renderEGLContext,
@@ -148,16 +148,16 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
     private void createPeerFactoryInternal(Context context,
                                            FactoryCreationListener factoryCreationListener) {
         PeerConnectionFactory.initializeInternalTracer();
-        if (peerConnectionParameters.tracing) {
+        if (mPeerConnectionParameters.tracing) {
             PeerConnectionFactory.startInternalTracingCapture(
                     Environment.getExternalStorageDirectory().getAbsolutePath()
                             + File.separator + FILE_TRACE_NAME);
         }
         Log.d(TAG, "Create peer connection factory. Use video: "
-                + peerConnectionParameters.videoCallEnabled);
+                + mPeerConnectionParameters.videoCallEnabled);
 
         StringBuilder fieldTrialsBuilder = new StringBuilder();
-        if (peerConnectionParameters.videoFlexfecEnabled) {
+        if (mPeerConnectionParameters.videoFlexfecEnabled) {
             fieldTrialsBuilder.append(VIDEO_FLEXFEC_FIELDTRIAL);
             Log.d(TAG, "Enable FlexFEC field trial.");
         }
@@ -166,23 +166,23 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
         Log.d(TAG, "Field trials: " + fieldTrialsBuilder.toString());
 
 
-        Log.d(TAG, "Option useOpenSLES: " + peerConnectionParameters.useOpenSLES);
-        if (!peerConnectionParameters.useOpenSLES) {
+        Log.d(TAG, "Option useOpenSLES: " + mPeerConnectionParameters.useOpenSLES);
+        if (!mPeerConnectionParameters.useOpenSLES) {
             WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(true);
         } else {
             WebRtcAudioManager.setBlacklistDeviceForOpenSLESUsage(false);
         }
 
-        Log.d(TAG, "Option disableBuiltInAEC: " + peerConnectionParameters.disableBuiltInAEC);
-        if (peerConnectionParameters.disableBuiltInAEC) {
+        Log.d(TAG, "Option disableBuiltInAEC: " + mPeerConnectionParameters.disableBuiltInAEC);
+        if (mPeerConnectionParameters.disableBuiltInAEC) {
             WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(true);
         } else {
             WebRtcAudioUtils.setWebRtcBasedAcousticEchoCanceler(false);
         }
 
 
-        Log.d(TAG, "Option disableBuiltInNS: " + peerConnectionParameters.disableBuiltInNS);
-        if (peerConnectionParameters.disableBuiltInNS) {
+        Log.d(TAG, "Option disableBuiltInNS: " + mPeerConnectionParameters.disableBuiltInNS);
+        if (mPeerConnectionParameters.disableBuiltInNS) {
             WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(true);
         } else {
             WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(false);
@@ -190,8 +190,8 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
 
         WebRtcAudioRecord.setErrorCallback(VoIPRTCClient.this);
         if (PeerConnectionFactory.initializeAndroidGlobals(
-                context, true, false, peerConnectionParameters.videoCodecHwAcceleration)) {
-            factory = new PeerConnectionFactory(options);
+                context, true, false, mPeerConnectionParameters.videoCodecHwAcceleration)) {
+            mPeerFactory = new PeerConnectionFactory(mPeerFactoryOptions);
         } else {
             Log.e(TAG, "Failed to initializeAndroidGlobals");
         }
@@ -201,7 +201,7 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
         */
         createMediaConstraints();
         boolean isSuccessful = isCreated();
-        if (isSuccessful && peerConnectionParameters.tracing) {
+        if (isSuccessful && mPeerConnectionParameters.tracing) {
             Logging.enableTracing(NATIVE_TRACE_USE, EnumSet.of
                     (Logging.TraceLevel.TRACE_DEFAULT));
             Logging.enableLogToDebugOutput(Logging.Severity.LS_INFO);
@@ -230,11 +230,11 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
         VideoTrack videoTrack = null;
         AudioTrack audioTrack;
 
-        if (peerConnectionParameters.videoCallEnabled && renderEGLContext != null) {
-            factory.setVideoHwAccelerationOptions(renderEGLContext, renderEGLContext);
+        if (mPeerConnectionParameters.videoCallEnabled && renderEGLContext != null) {
+            mPeerFactory.setVideoHwAccelerationOptions(renderEGLContext, renderEGLContext);
         }
         PeerConnection.RTCConfiguration rtcConfig =
-                new PeerConnection.RTCConfiguration(peerConnectionParameters.iceServers);
+                new PeerConnection.RTCConfiguration(mPeerConnectionParameters.iceServers);
         /* - TCP candidates are only useful when connecting
          *   to a server that supports ICE-TCP.
          * - Use ECDSA encryption.
@@ -246,19 +246,19 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
                 .ContinualGatheringPolicy.GATHER_CONTINUALLY;
         rtcConfig.keyType = PeerConnection.KeyType.ECDSA;
 
-        Log.d(TAG, "PCConstraints: " + pcConstraints.toString());
-        peerConnection = factory.createPeerConnection(rtcConfig,
-                pcConstraints, rtcSession);
+        Log.d(TAG, "PCConstraints: " + mPeerConstraints.toString());
+        peerConnection = mPeerFactory.createPeerConnection(rtcConfig,
+                mPeerConstraints, rtcSession);
 
         Log.d(TAG, "Created PeerConnection.");
-        if (peerConnectionParameters.dataChannelParameters != null) {
+        if (mPeerConnectionParameters.dataChannelParameters != null) {
             DataChannel.Init init = new DataChannel.Init();
-            init.ordered = peerConnectionParameters.dataChannelParameters.ordered;
-            init.negotiated = peerConnectionParameters.dataChannelParameters.negotiated;
-            init.maxRetransmits = peerConnectionParameters.dataChannelParameters.maxRetransmits;
-            init.maxRetransmitTimeMs = peerConnectionParameters.dataChannelParameters.maxRetransmitTimeMs;
-            init.id = peerConnectionParameters.dataChannelParameters.id;
-            init.protocol = peerConnectionParameters.dataChannelParameters.protocol;
+            init.ordered = mPeerConnectionParameters.dataChannelParameters.ordered;
+            init.negotiated = mPeerConnectionParameters.dataChannelParameters.negotiated;
+            init.maxRetransmits = mPeerConnectionParameters.dataChannelParameters.maxRetransmits;
+            init.maxRetransmitTimeMs = mPeerConnectionParameters.dataChannelParameters.maxRetransmitTimeMs;
+            init.id = mPeerConnectionParameters.dataChannelParameters.id;
+            init.protocol = mPeerConnectionParameters.dataChannelParameters.protocol;
             dataChannel = peerConnection.createDataChannel(DATA_CHANNEL_UID, init);
             Log.d(TAG, "Created PeerConnection - DataChannel!");
         }
@@ -267,27 +267,27 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
          * create/add them to the main MediaStream
          */
         checkAndCreateStream(videoCapturer);
-        if (peerConnectionParameters.videoCallEnabled && videoCapturer != null
+        if (mPeerConnectionParameters.videoCallEnabled && videoCapturer != null
                 && videoCallbackLocal != null) {
             videoTrack = createVideoTrack(videoCapturer, videoCallbackLocal);
             findVideoSender(peerConnection);
-            mediaStream.addTrack(videoTrack);
+            mMediaStream.addTrack(videoTrack);
         }
         audioTrack = createAudioTrack();
-        mediaStream.addTrack(audioTrack);
+        mMediaStream.addTrack(audioTrack);
 
-        if (peerConnectionParameters.aecDump) {
+        if (mPeerConnectionParameters.aecDump) {
             try {
-                aecDumpFileDescriptor = ParcelFileDescriptor.open(new File(Environment
+                mAecDumpFileDescriptor = ParcelFileDescriptor.open(new File(Environment
                         .getExternalStorageDirectory().getPath() + File.separator + FILE_AUDIO_DUMP),
                                 ParcelFileDescriptor.MODE_READ_WRITE | ParcelFileDescriptor.MODE_CREATE
                                         | ParcelFileDescriptor.MODE_TRUNCATE);
-                factory.startAecDump(aecDumpFileDescriptor.getFd(), -1);
+                mPeerFactory.startAecDump(mAecDumpFileDescriptor.getFd(), -1);
             } catch (IOException e) {
                 Log.e(TAG, "Can not open aecdump file!", e);
             }
         }
-        peerConnection.addStream(mediaStream);
+        peerConnection.addStream(mMediaStream);
         peerCreationListener.onPeerCreated(rtcSession.configure
                 (peerConnection, dataChannel, audioTrack, videoTrack));
     }
@@ -295,20 +295,20 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
 
 
     private void checkAndCreateStream (@Nullable VideoCapturer videoCapturer) {
-        if (mediaStream == null) {
-            mediaStream = factory.createLocalMediaStream(STREAM_UID);
+        if (mMediaStream == null) {
+            mMediaStream = mPeerFactory.createLocalMediaStream(STREAM_UID);
         }
-        if (audioSource == null) {
-            audioSource = factory.createAudioSource(audioConstraints);
+        if (mAudioSource == null) {
+            mAudioSource = mPeerFactory.createAudioSource(mAudioConstraints);
         }
-        if (peerConnectionParameters.videoCallEnabled
-                && videoSource == null && videoCapturer != null) {
-            videoSource = factory.createVideoSource(videoCapturer);
+        if (mPeerConnectionParameters.videoCallEnabled
+                && mVideoSource == null && videoCapturer != null) {
+            mVideoSource = mPeerFactory.createVideoSource(videoCapturer);
         }
     }
 
     private AudioTrack createAudioTrack() {
-        AudioTrack audioTrack = factory.createAudioTrack(AUDIO_TRACK_ID, audioSource);
+        AudioTrack audioTrack = mPeerFactory.createAudioTrack(AUDIO_TRACK_ID, mAudioSource);
         audioTrack.setEnabled(true);
         return audioTrack;
     }
@@ -318,10 +318,10 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
      */
     private VideoTrack createVideoTrack(@NonNull VideoCapturer capturer,
                                         @NonNull VideoRenderer.Callbacks callbacks) {
-        capturer.startCapture(peerConnectionParameters.videoWidth,
-                peerConnectionParameters.videoHeight, peerConnectionParameters.videoFps);
+        capturer.startCapture(mPeerConnectionParameters.videoWidth,
+                mPeerConnectionParameters.videoHeight, mPeerConnectionParameters.videoFps);
 
-        VideoTrack videoTrack = factory.createVideoTrack(VIDEO_TRACK_ID, videoSource);
+        VideoTrack videoTrack = mPeerFactory.createVideoTrack(VIDEO_TRACK_ID, mVideoSource);
         videoTrack.setEnabled(true);
         videoTrack.addRenderer(new VideoRenderer(callbacks));
         return videoTrack;
@@ -347,40 +347,40 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
 
 
     private void createMediaConstraints() {
-        pcConstraints = new MediaConstraints();
-        pcConstraints.optional.add(new MediaConstraints.
+        mPeerConstraints = new MediaConstraints();
+        mPeerConstraints.optional.add(new MediaConstraints.
                 KeyValuePair(DTLS_SRTP_KEY_AGREEMENT_CONSTRAINT, "true"));
 
         /* Create Audio constraints Added for audio performance measurements.
          * By default there are enabled!
          */
-        audioConstraints = new MediaConstraints();
-        if (peerConnectionParameters.noAudioProcessing) {
+        mAudioConstraints = new MediaConstraints();
+        if (mPeerConnectionParameters.noAudioProcessing) {
             Log.d(TAG, "Disabling audio processing");
-            audioConstraints.mandatory.add(
+            mAudioConstraints.mandatory.add(
                     new MediaConstraints.KeyValuePair(AUDIO_ECHO_CANCELLATION_CONSTRAINT, "false"));
-            audioConstraints.mandatory.add(
+            mAudioConstraints.mandatory.add(
                     new MediaConstraints.KeyValuePair(AUDIO_AUTO_GAIN_CONTROL_CONSTRAINT, "false"));
-            audioConstraints.mandatory.add(
+            mAudioConstraints.mandatory.add(
                     new MediaConstraints.KeyValuePair(AUDIO_HIGH_PASS_FILTER_CONSTRAINT, "false"));
-            audioConstraints.mandatory.add(
+            mAudioConstraints.mandatory.add(
                     new MediaConstraints.KeyValuePair(AUDIO_NOISE_SUPPRESSION_CONSTRAINT, "false"));
         }
-        if (peerConnectionParameters.enableLevelControl) {
+        if (mPeerConnectionParameters.enableLevelControl) {
             Log.d(TAG, "Enabling level control.");
-            audioConstraints.mandatory.add(
+            mAudioConstraints.mandatory.add(
                     new MediaConstraints.KeyValuePair(AUDIO_LEVEL_CONTROL_CONSTRAINT, "true"));
         }
         /* Create SDP constraints.
          */
-        sdpMediaConstraints = new MediaConstraints();
-        sdpMediaConstraints.mandatory.add(
+        mSdpMediaConstraints = new MediaConstraints();
+        mSdpMediaConstraints.mandatory.add(
                 new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
-        if (peerConnectionParameters.videoCallEnabled) {
-            sdpMediaConstraints.mandatory.add(
+        if (mPeerConnectionParameters.videoCallEnabled) {
+            mSdpMediaConstraints.mandatory.add(
                     new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
         } else {
-            sdpMediaConstraints.mandatory.add(
+            mSdpMediaConstraints.mandatory.add(
                     new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"));
         }
     }

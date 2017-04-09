@@ -53,9 +53,9 @@ public class RTCSession implements PeerConnection.Observer {
         /**
          * Callback fired once local SDP is created and set.
          */
-        void onOfferDescriptionSet(final SessionDescription sdp);
+        void onLocalSdpForOffer(final SessionDescription sdp);
 
-        void onRemoteDescriptionSet(final SessionDescription sdp);
+        void onLocalSdpForRemote(final SessionDescription sdp);
 
         /**
          * Callback fired once local Ice candidate is generated.
@@ -120,9 +120,19 @@ public class RTCSession implements PeerConnection.Observer {
         return mWorkingSdp;
     }
 
+    /**
+     * Session ID should be configured, to be the same, of both side.
+     * It will help, to resolve objects during signaling
+     */
+
+    public void setSessionId (long sessionId) {
+        mSessionId = sessionId;
+    }
+
     public long getSessionId () {
         return mSessionId;
     }
+
 
     public void setPeerEventsListener (PeerEventsListener peerEventsListener) {
         this.mPeerEventsListener = peerEventsListener;
@@ -293,13 +303,13 @@ public class RTCSession implements PeerConnection.Observer {
                 public void run() {
                     if (isInitiator) {
                         if (mPeerConnection.getRemoteDescription() == null) {
-                            mPeerEventsListener.onOfferDescriptionSet(mWorkingSdp);
+                            mPeerEventsListener.onLocalSdpForOffer(mWorkingSdp);
                         } else {
                             drainCandidates();
                         }
                     } else {
                         if (mPeerConnection.getLocalDescription() != null) {
-                            mPeerEventsListener.onRemoteDescriptionSet(mWorkingSdp);
+                            mPeerEventsListener.onLocalSdpForRemote(mWorkingSdp);
                             drainCandidates();
                         } else {
                             Log.d(TAG, "Remote SDP set successfully!");

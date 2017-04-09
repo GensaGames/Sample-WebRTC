@@ -9,7 +9,7 @@ import android.support.annotation.NonNull;
 import android.util.Log;
 
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
-import com.gensagames.samplewebrtc.model.RTCMessageItem;
+import com.gensagames.samplewebrtc.model.BTMessageItem;
 import com.gensagames.samplewebrtc.signaling.helper.ConnectivityChangeListener;
 import com.gensagames.samplewebrtc.signaling.helper.MessageObservable;
 import com.google.gson.Gson;
@@ -101,12 +101,12 @@ public class BTSignalingObserver implements MessageObservable, ConnectivityChang
     private void handleIncomingMsg (String msg) {
         try {
             Gson gson = new Gson();
-            RTCMessageItem rtcMessageItem =
-                    gson.fromJson(msg, RTCMessageItem.class);
+            BTMessageItem btMsg =
+                    gson.fromJson(msg, BTMessageItem.class);
             Intent intent = null;
-            if (rtcMessageItem.getMessageType() ==
-                    RTCMessageItem.MessageType.SDP_EXCHANGE) {
-                switch (rtcMessageItem.getWorkingSdp().type) {
+            if (btMsg.getMessageType() ==
+                    BTMessageItem.MessageType.SDP_EXCHANGE) {
+                switch (btMsg.getWorkingSdp().type) {
                     case OFFER:
                         intent = new Intent(VoIPEngineService.ACTION_OFFER_SDP, Uri.EMPTY,
                                 mLocalContext, VoIPEngineService.class);
@@ -118,7 +118,7 @@ public class BTSignalingObserver implements MessageObservable, ConnectivityChang
                 }
             }
             if (intent != null) {
-                intent.putExtra(VoIPEngineService.EXTRA_RTC_ITEM, rtcMessageItem);
+                intent.putExtra(VoIPEngineService.EXTRA_BT_MSG, btMsg);
                 mLocalContext.startService(intent);
             }
         }

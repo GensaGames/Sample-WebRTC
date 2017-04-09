@@ -13,7 +13,7 @@ import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.engine.parameters.PeerConnectionParameters;
 import com.gensagames.samplewebrtc.engine.utils.PairTuple;
 import com.gensagames.samplewebrtc.model.BTDeviceItem;
-import com.gensagames.samplewebrtc.model.RTCMessageItem;
+import com.gensagames.samplewebrtc.model.BTMessageItem;
 import com.gensagames.samplewebrtc.signaling.BTSignalingObserver;
 
 import org.webrtc.IceCandidate;
@@ -40,7 +40,7 @@ public class VoIPEngineService extends Service {
     public static final String ACTION_ANSWER_SDP = "action.answer.sdp";
 
     public static final String EXTRA_DEVICE_ITEM = "extra.device.item";
-    public static final String EXTRA_RTC_ITEM = "extra.rtc.msg";
+    public static final String EXTRA_BT_MSG = "extra.bt.msg";
     public static final String ANNOUNCE_INCOMING_CALL = "announce.incoming.call";
 
     private Handler mLocalHandler;
@@ -78,14 +78,16 @@ public class VoIPEngineService extends Service {
                         .getSerializableExtra(EXTRA_DEVICE_ITEM));
                 break;
             case ACTION_ANSWER_CALL:
-                answerIncomingCall((RTCMessageItem) intent
-                        .getSerializableExtra(EXTRA_RTC_ITEM));
+                answerIncomingCall((BTMessageItem) intent
+                        .getSerializableExtra(EXTRA_BT_MSG));
                 break;
             case ACTION_OFFER_SDP:
-                notifyIncomingCall((RTCMessageItem) intent
-                        .getSerializableExtra(EXTRA_RTC_ITEM));
+                receivedOfferAction((BTMessageItem) intent
+                        .getSerializableExtra(EXTRA_BT_MSG));
                 break;
             case ACTION_ANSWER_SDP:
+                receivedAnswerAction((BTMessageItem) intent
+                        .getSerializableExtra(EXTRA_BT_MSG));
                 break;
             case ACTION_IDLE:
                 break;
@@ -93,7 +95,24 @@ public class VoIPEngineService extends Service {
         return START_STICKY ;
     }
 
-    private void answerIncomingCall (final RTCMessageItem item) {
+    private void receivedOfferAction(BTMessageItem item) {
+        Intent intent = new Intent(ANNOUNCE_INCOMING_CALL);
+        intent.putExtra(EXTRA_BT_MSG, item);
+        getApplicationContext().sendBroadcast(intent);
+    }
+
+
+    private void receivedAnswerAction (BTMessageItem item) {
+        RTCSession session = mSessionMap.get(item.getPeerSessionId()).getFirst();
+        if (session == null) {
+            Log.e(TAG, "Cannot find session!");
+            return;
+        }
+        session.setRemoteDescription(item.getWorkingSdp());
+        Log.d(TAG, "SHOULD WORK NOW!!!!");
+    }
+
+    private void answerIncomingCall (final BTMessageItem item) {
         VoIPRTCClient client = VoIPRTCClient.getInstance();
         if (!client.isCreated()) {
             Log.e(TAG, "PeerFactory not created!");
@@ -108,22 +127,16 @@ public class VoIPEngineService extends Service {
         client.createPeerConnection(new VoIPRTCClient.PeerCreationListener() {
             @Override
             public void onPeerCreated(RTCSession session) {
-                long sessionId = session.getSessionId();
+                long sessionId = item.getPeerSessionId();
                 mSessionMap.put(sessionId, new PairTuple<>(session, BTDeviceItem.
                         createFromBT(device, getString(R.string.name_unknown))));
+                session.setSessionId(sessionId);
                 session.setPeerEventsListener(new PeerEventsHandler(sessionId));
                 session.setRemoteDescription(item.getWorkingSdp());
                 session.createAnswer();
             }
         }, null, null, null, null);
     }
-
-    private void notifyIncomingCall (RTCMessageItem item) {
-        Intent intent = new Intent(ANNOUNCE_INCOMING_CALL);
-        intent.putExtra(EXTRA_RTC_ITEM, item);
-        getApplicationContext().sendBroadcast(intent);
-    }
-
 
     /**
      * Create connection for bluetooth, and just send raw data, as ping!
@@ -150,6 +163,11 @@ public class VoIPEngineService extends Service {
     }
 
 
+    /**
+     * ******************************************************
+     * Main Handler for all PeerConnection Events.
+     * Control specific behavior here.
+     */
 
     private class PeerEventsHandler implements RTCSession.PeerEventsListener {
         private long mSessionId;
@@ -158,18 +176,22 @@ public class VoIPEngineService extends Service {
             mSessionId = sessionId;
         }
 
-        @Override
-        public void onOfferDescriptionSet(SessionDescription sdp) {
+        private void signalingSdp (SessionDescription sdp) {
             PairTuple<RTCSession, BTDeviceItem> tuple = mSessionMap.get(mSessionId);
-            RTCMessageItem messageItem = new RTCMessageItem(tuple.getSecond().getDeviceName(),
-                    tuple.getFirst().getSessionId(), RTCMessageItem.MessageType.SDP_EXCHANGE,
-                    tuple.getFirst().getWorkingSdp(), null);
+            BTMessageItem messageItem = new BTMessageItem(tuple.getSecond().getDeviceName(),
+                    tuple.getFirst().getSessionId(), BTMessageItem.MessageType.SDP_EXCHANGE,
+                    sdp, null);
             mBtSignalingObserver.sendWhenReady(messageItem);
         }
 
         @Override
-        public void onRemoteDescriptionSet(SessionDescription sdp) {
+        public void onLocalSdpForOffer(SessionDescription sdp) {
+            signalingSdp(sdp);
+        }
 
+        @Override
+        public void onLocalSdpForRemote(SessionDescription sdp) {
+            signalingSdp(sdp);
         }
 
         @Override
@@ -206,6 +228,7 @@ public class VoIPEngineService extends Service {
         public void onPeerConnectionError(String description) {
 
         }
+
     }
 
 }

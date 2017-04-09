@@ -18,7 +18,7 @@ import android.view.MenuItem;
 import android.view.View;
 
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
-import com.gensagames.samplewebrtc.model.RTCMessageItem;
+import com.gensagames.samplewebrtc.model.BTMessageItem;
 import com.gensagames.samplewebrtc.view.fragments.MainSliderFragment;
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.view.fragments.AboutFragment;
@@ -57,14 +57,14 @@ public class MainActivity extends AppCompatActivity {
         registerReceiver(mIncomingCallReceiver, intentFilter);
     }
 
-    private void handleIncomingCall(RTCMessageItem item) {
+    private void handleIncomingCall(BTMessageItem item) {
 
         /**
          * TODO(UI) After some actions
          */
         Intent intent = new Intent(VoIPEngineService.ACTION_ANSWER_CALL, Uri.EMPTY,
                 this, VoIPEngineService.class);
-        intent.putExtra(VoIPEngineService.EXTRA_RTC_ITEM, item);
+        intent.putExtra(VoIPEngineService.EXTRA_BT_MSG, item);
         startService(intent);
     }
 
@@ -144,8 +144,8 @@ public class MainActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
             if (action.equals(VoIPEngineService.ANNOUNCE_INCOMING_CALL)) {
-                handleIncomingCall((RTCMessageItem) intent
-                        .getSerializableExtra(VoIPEngineService.EXTRA_RTC_ITEM));
+                handleIncomingCall((BTMessageItem) intent
+                        .getSerializableExtra(VoIPEngineService.EXTRA_BT_MSG));
             }
         }
 

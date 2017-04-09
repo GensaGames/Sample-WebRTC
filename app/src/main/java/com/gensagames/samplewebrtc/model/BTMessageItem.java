@@ -12,7 +12,7 @@ import java.io.Serializable;
  * GensaGames
  */
 
-public class RTCMessageItem implements Serializable{
+public class BTMessageItem implements Serializable{
     private String userName;
     private MessageType msgType;
     private String additionalContent;
@@ -29,9 +29,9 @@ public class RTCMessageItem implements Serializable{
         SDP_EXCHANGE
     }
 
-    public RTCMessageItem(@NonNull String userName, long peerSessionId,
-                          @NonNull MessageType msgType, @Nullable SessionDescription workingSdp,
-                          @Nullable String additionalContent) {
+    public BTMessageItem(@NonNull String userName, long peerSessionId,
+                         @NonNull MessageType msgType, @Nullable SessionDescription workingSdp,
+                         @Nullable String additionalContent) {
         this.userName = userName;
         this.peerSessionId = peerSessionId;
         this.msgType = msgType;
