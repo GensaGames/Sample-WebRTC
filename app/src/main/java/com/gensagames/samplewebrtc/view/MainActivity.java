@@ -32,8 +32,6 @@ public class MainActivity extends AppCompatActivity {
     private FragmentManager mFragmentManager;
     private CoordinatorLayout mCoordinatorLayout;
 
-    private IncomingCallReceiver mIncomingCallReceiver;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -42,30 +40,6 @@ public class MainActivity extends AppCompatActivity {
 
         startService(new Intent(VoIPEngineService.ACTION_IDLE, Uri.EMPTY,
                 getApplicationContext(), VoIPEngineService.class));
-        registerVoIPReceiver();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        unregisterReceiver(mIncomingCallReceiver);
-    }
-
-    private void registerVoIPReceiver () {
-        mIncomingCallReceiver = new IncomingCallReceiver();
-        IntentFilter intentFilter = new IntentFilter(VoIPEngineService.ANNOUNCE_INCOMING_CALL);
-        registerReceiver(mIncomingCallReceiver, intentFilter);
-    }
-
-    private void handleIncomingCall(BTMessageItem item) {
-
-        /**
-         * TODO(UI) After some actions
-         */
-        Intent intent = new Intent(VoIPEngineService.ACTION_ANSWER_CALL, Uri.EMPTY,
-                this, VoIPEngineService.class);
-        intent.putExtra(VoIPEngineService.EXTRA_BT_MSG, item);
-        startService(intent);
     }
 
     private void setNavigationDrawer () {
@@ -138,16 +112,4 @@ public class MainActivity extends AppCompatActivity {
         mDrawerToggle.syncState();
     }
 
-    private  class IncomingCallReceiver extends BroadcastReceiver {
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (action.equals(VoIPEngineService.ANNOUNCE_INCOMING_CALL)) {
-                handleIncomingCall((BTMessageItem) intent
-                        .getSerializableExtra(VoIPEngineService.EXTRA_BT_MSG));
-            }
-        }
-
-    }
 }

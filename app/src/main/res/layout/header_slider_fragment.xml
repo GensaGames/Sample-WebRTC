@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:fitsSystemWindows="true"
-    android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar">
+    app:layout_behavior="com.gensagames.samplewebrtc.view.helper.DisableableAppBarLayoutBehavior">
 
     <android.support.design.widget.CollapsingToolbarLayout
         android:id="@+id/headerCollapsingToolbar"
@@ -20,7 +20,7 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:layout_gravity="top"
-            app:layout_collapseMode="pin"
+            app:layout_collapseMode="none"
             app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
             app:title="@string/app_name" />
 
