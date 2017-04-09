@@ -85,6 +85,9 @@ public class PeerConnectionParameters {
     public static PeerConnectionParameters getDefaultAudioOnly () {
         List<PeerConnection.IceServer> iceServers = new ArrayList<>();
         iceServers.add(new PeerConnection.IceServer(Configs.GOOGLE_STUN_URI));
+        iceServers.add(new PeerConnection.IceServer(Configs.GOOGLE_STUN_URI_1));
+        iceServers.add(new PeerConnection.IceServer(Configs.SIPPHONE_STUN_URI));
+
         return new PeerConnectionParameters(false, iceServers, false, true, Configs.HD_VIDEO_WIDTH,
                 Configs.HD_VIDEO_HEIGHT, Configs.DEFAULT_FPS, Configs.DEFAULT_VIDEO_BITRATE,
                 Configs.CODEC_DEFAULT, true, true, Configs.AUDIO_START_BITRATE, Configs.CODEC_DEFAULT,

@@ -1,8 +1,4 @@
 <resources>
-    <string name="app_name">Sample WebRTC</string>
-
-    <string name="drawer_header">Chromium WebRTC</string>
-    <string name="action_settings">Settings</string>
 
     <!--Slider Tab Headers-->
     <string name="slider_call_header">Call Session</string>
@@ -15,12 +11,19 @@
     <string name="nav_item_settings_primary">Primary</string>
     <string name="nav_item_settings_other">Other</string>
 
-    <!--Call List Fragment-->
+    <!--Call and Device List Fragment-->
     <string name="swipe_refresh_tip">Pull down to update List…</string>
     <string name="dialog_tittle_make_call">Make Call</string>
     <string name="dialog_msg_make_call">Make Bluetooth Signaling Call to the User - %1$s</string>
+    <string name="button_answer_call">Answer Call!</string>
+    <string name="button_hangup_call">Hangup Call!</string>
+    <string name="state_outgoing_call">Calling to %1$s</string>
+    <string name="state_incoming_call">Incoming call from %1$s</string>
 
 
     <!-- Other -->
+    <string name="app_name">Sample WebRTC</string>
     <string name="name_unknown">Unknown</string>
+    <string name="drawer_header">Chromium WebRTC</string>
+    <string name="action_settings">Settings</string>
 </resources>

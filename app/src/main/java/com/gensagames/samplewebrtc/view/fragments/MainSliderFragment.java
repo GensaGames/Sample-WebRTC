@@ -17,27 +17,31 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
-import android.util.Log;
+import android.support.v7.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
-import com.gensagames.samplewebrtc.model.BTMessageItem;
-import com.gensagames.samplewebrtc.view.helper.DisableableAppBarLayoutBehavior;
+import com.gensagames.samplewebrtc.model.BluetoothDeviceItem;
+import com.gensagames.samplewebrtc.model.SignalingMessageItem;
+import com.gensagames.samplewebrtc.view.helper.CollapseAppBarLayoutBehavior;
 import com.gensagames.samplewebrtc.view.helper.FragmentHeaderTransaction;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
 
 public class MainSliderFragment extends Fragment implements FragmentHeaderTransaction,
         ViewPager.OnPageChangeListener {
 
+    private View mBtnAnswerView;
+    private View mBtnHangupView;
+
     private TabLayout mTabLayout;
     private ViewPager mViewPager;
     private AppBarLayout mAppBarLayout;
+    private CollapsingToolbarLayout mCollapsingLayout;
     private LocalFragmentAdapter mLocalFragmentAdapter;
     private IncomingCallReceiver mIncomingCallReceiver;
-    private CollapsingToolbarLayout mCollapsingLayout;
 
     @Nullable
     @Override
@@ -50,6 +54,8 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
                 findViewById(R.id.headerCollapsingToolbar);
         mTabLayout = (TabLayout) getActivity().findViewById(R.id.tabs);
         mViewPager = (ViewPager) x.findViewById(R.id.viewpager);
+        mBtnAnswerView = x.findViewById(R.id.fragmentBtnAnswer);
+        mBtnHangupView = x.findViewById(R.id.fragmentBtnHangup);
 
         setupViewPager();
         registerVoIPReceiver();
@@ -62,38 +68,88 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         getActivity().unregisterReceiver(mIncomingCallReceiver);
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-
-        setExpandEnabled(false);
+    private void handleCallDisconnected (SignalingMessageItem item) {
+        enableCollapseToolbar(false);
+        mBtnAnswerView.setVisibility(View.GONE);
+        mBtnHangupView.setVisibility(View.GONE);
     }
 
-    private void showIncomingCall(BTMessageItem item) {
-
+    private void handleOutgoingCall (final BluetoothDeviceItem item) {
+        enableCollapseToolbar(true);
+        mCollapsingLayout.setTitle(getString(R.string.state_outgoing_call,
+                item.getDeviceName()));
+        mBtnHangupView.setVisibility(View.VISIBLE);
+        mBtnAnswerView.setVisibility(View.GONE);
+        mBtnHangupView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Activity activity = getActivity();
+                Intent intent = new Intent(VoIPEngineService.ACTION_HANGUP_CALL, Uri.EMPTY,
+                        activity, VoIPEngineService.class);
+                intent.putExtra(VoIPEngineService.EXTRA_SIGNAL_MSG, item);
+                activity.startService(intent);
+            }
+        });
     }
 
-    private void answerIncomingCall (BTMessageItem item) {
-        Activity activity = getActivity();
-        Intent intent = new Intent(VoIPEngineService.ACTION_ANSWER_CALL, Uri.EMPTY,
-                activity, VoIPEngineService.class);
-        intent.putExtra(VoIPEngineService.EXTRA_BT_MSG, item);
-        activity.startService(intent);
+    private void handleCallConnected (final SignalingMessageItem item) {
+        enableCollapseToolbar(true);
+        mBtnHangupView.setVisibility(View.VISIBLE);
+        mBtnAnswerView.setVisibility(View.GONE);
+        mBtnHangupView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Activity activity = getActivity();
+                Intent intent = new Intent(VoIPEngineService.ACTION_HANGUP_CALL, Uri.EMPTY,
+                        activity, VoIPEngineService.class);
+                intent.putExtra(VoIPEngineService.EXTRA_SIGNAL_MSG, item);
+                activity.startService(intent);
+            }
+        });
+    }
+
+    private void handleIncomingCall(final SignalingMessageItem item) {
+        enableCollapseToolbar(true);
+        mCollapsingLayout.setTitle(getString(R.string.state_incoming_call,
+                item.getUserName()));
+        mBtnAnswerView.setVisibility(View.VISIBLE);
+        mBtnAnswerView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Activity activity = getActivity();
+                Intent intent = new Intent(VoIPEngineService.ACTION_ANSWER_CALL, Uri.EMPTY,
+                        activity, VoIPEngineService.class);
+                intent.putExtra(VoIPEngineService.EXTRA_SIGNAL_MSG, item);
+                activity.startService(intent);
+            }
+        });
     }
 
     private void registerVoIPReceiver () {
         mIncomingCallReceiver = new IncomingCallReceiver();
-        IntentFilter intentFilter = new IntentFilter(VoIPEngineService.ANNOUNCE_INCOMING_CALL);
+        IntentFilter intentFilter = new IntentFilter(VoIPEngineService.NOTIFY_INCOMING_CALL);
+        intentFilter.addAction(VoIPEngineService.NOTIFY_CALL_CONNECTED);
+        intentFilter.addAction(VoIPEngineService.NOTIFY_CALL_DISCONNECTED);
+        intentFilter.addAction(VoIPEngineService.NOTIFY_OUTGOING_CALL);
         getActivity().registerReceiver(mIncomingCallReceiver, intentFilter);
     }
 
 
+    private void enableCollapseToolbar (boolean enabled) {
+        mAppBarLayout.setExpanded(enabled, true);
+        CoordinatorLayout.LayoutParams layoutParams = (CoordinatorLayout.LayoutParams)
+                mAppBarLayout.getLayoutParams();
 
-    private void setExpandEnabled(boolean enabled) {
+        CollapseAppBarLayoutBehavior behavior = (CollapseAppBarLayoutBehavior)
+                layoutParams.getBehavior();
+        if (behavior != null) {
+            behavior.setEnabled(enabled);
+        }
     }
 
 
     private void setupViewPager () {
+        enableCollapseToolbar(false);
         mLocalFragmentAdapter = new LocalFragmentAdapter(getChildFragmentManager());
         mViewPager.setAdapter(mLocalFragmentAdapter);
 
@@ -130,14 +186,28 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
      * ****************************************************
      * Defined receiver for receiving call actions.
      */
-    private  class IncomingCallReceiver extends BroadcastReceiver {
+    private class IncomingCallReceiver extends BroadcastReceiver {
 
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            if (action.equals(VoIPEngineService.ANNOUNCE_INCOMING_CALL)) {
-                showIncomingCall((BTMessageItem) intent
-                        .getSerializableExtra(VoIPEngineService.EXTRA_BT_MSG));
+            SignalingMessageItem item = (SignalingMessageItem) intent
+                    .getSerializableExtra(VoIPEngineService.EXTRA_SIGNAL_MSG);
+            BluetoothDeviceItem deviceItem = (BluetoothDeviceItem) intent
+                    .getSerializableExtra(VoIPEngineService.EXTRA_DEVICE_ITEM);
+            switch (action) {
+                case VoIPEngineService.NOTIFY_INCOMING_CALL:
+                    handleIncomingCall(item);
+                    break;
+                case VoIPEngineService.NOTIFY_CALL_CONNECTED:
+                    handleCallConnected(item);
+                    break;
+                case VoIPEngineService.NOTIFY_CALL_DISCONNECTED:
+                    handleCallDisconnected(item);
+                    break;
+                case VoIPEngineService.NOTIFY_OUTGOING_CALL:
+                    handleOutgoingCall(deviceItem);
+                    break;
             }
         }
 

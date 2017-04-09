@@ -9,11 +9,13 @@ import android.support.annotation.NonNull;
 import android.util.Log;
 
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
-import com.gensagames.samplewebrtc.model.BTMessageItem;
+import com.gensagames.samplewebrtc.model.SignalingMessageItem;
 import com.gensagames.samplewebrtc.signaling.helper.ConnectivityChangeListener;
 import com.gensagames.samplewebrtc.signaling.helper.MessageObservable;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+
+import org.webrtc.SessionDescription;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -101,24 +103,27 @@ public class BTSignalingObserver implements MessageObservable, ConnectivityChang
     private void handleIncomingMsg (String msg) {
         try {
             Gson gson = new Gson();
-            BTMessageItem btMsg =
-                    gson.fromJson(msg, BTMessageItem.class);
+            SignalingMessageItem btMsg = gson.fromJson(msg, SignalingMessageItem.class);
+            SignalingMessageItem.MessageType btMsgType = btMsg.getMessageType();
             Intent intent = null;
-            if (btMsg.getMessageType() ==
-                    BTMessageItem.MessageType.SDP_EXCHANGE) {
-                switch (btMsg.getWorkingSdp().type) {
-                    case OFFER:
-                        intent = new Intent(VoIPEngineService.ACTION_OFFER_SDP, Uri.EMPTY,
-                                mLocalContext, VoIPEngineService.class);
-                        break;
-                    case ANSWER:
-                        intent = new Intent(VoIPEngineService.ACTION_ANSWER_SDP, Uri.EMPTY,
-                                mLocalContext, VoIPEngineService.class);
-                        break;
+            if (btMsgType == SignalingMessageItem.MessageType.SDP_EXCHANGE) {
+                if (btMsg.getWorkingSdp().type == SessionDescription.Type.OFFER) {
+                    intent = new Intent(VoIPEngineService.ACTION_OFFER_SDP, Uri.EMPTY,
+                            mLocalContext, VoIPEngineService.class);
+                }
+                if (btMsg.getWorkingSdp().type == SessionDescription.Type.ANSWER) {
+                    intent = new Intent(VoIPEngineService.ACTION_ANSWER_SDP, Uri.EMPTY,
+                            mLocalContext, VoIPEngineService.class);
                 }
             }
+            if (btMsgType == SignalingMessageItem.MessageType.CANDIDATES) {
+                intent = new Intent(VoIPEngineService.ACTION_INCOMING_CANDIDATES, Uri.EMPTY,
+                        mLocalContext, VoIPEngineService.class);
+            }
+
+
             if (intent != null) {
-                intent.putExtra(VoIPEngineService.EXTRA_BT_MSG, btMsg);
+                intent.putExtra(VoIPEngineService.EXTRA_SIGNAL_MSG, btMsg);
                 mLocalContext.startService(intent);
             }
         }

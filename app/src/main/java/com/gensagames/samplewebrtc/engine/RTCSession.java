@@ -18,6 +18,8 @@ import org.webrtc.SessionDescription;
 import org.webrtc.StatsReport;
 import org.webrtc.VideoTrack;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 
@@ -40,6 +42,7 @@ public class RTCSession implements PeerConnection.Observer {
     private VideoTrack mVideoTrack;
 
     private Executor mWorkingExecutor;
+    private List<IceCandidate> mQueuedRemoteCandidates;
     private PeerConnection.IceConnectionState mIceConnectionState;
     private PeerEventsListener mPeerEventsListener;
     private SessionDescription mWorkingSdp;
@@ -80,19 +83,10 @@ public class RTCSession implements PeerConnection.Observer {
         void onIceDisconnected();
 
         /**
-         * Callback fired once peer connection is closed.
-         */
-        void onPeerConnectionClosed();
-
-        /**
          * Callback fired once peer connection statistics is ready.
          */
         void onPeerConnectionStatsReady(final StatsReport[] reports);
 
-        /**
-         * Callback fired once peer connection error happened.
-         */
-        void onPeerConnectionError(final String description);
     }
 
     protected RTCSession() {
@@ -112,6 +106,19 @@ public class RTCSession implements PeerConnection.Observer {
         return this;
     }
 
+    /**
+     * Session ID should be configured, to be the same, of both side.
+     * It will help, to resolve objects during signaling
+     */
+    public long getSessionId () {
+        return mSessionId;
+    }
+
+    public void setSessionId (long sessionId) {
+        mSessionId = sessionId;
+    }
+
+
     public PeerConnection.IceConnectionState getIceConnectionState() {
         return mIceConnectionState;
     }
@@ -120,19 +127,9 @@ public class RTCSession implements PeerConnection.Observer {
         return mWorkingSdp;
     }
 
-    /**
-     * Session ID should be configured, to be the same, of both side.
-     * It will help, to resolve objects during signaling
-     */
-
-    public void setSessionId (long sessionId) {
-        mSessionId = sessionId;
+    public void setRemoteCandidates (List<IceCandidate> iceCandidates) {
+        mQueuedRemoteCandidates = iceCandidates;
     }
-
-    public long getSessionId () {
-        return mSessionId;
-    }
-
 
     public void setPeerEventsListener (PeerEventsListener peerEventsListener) {
         this.mPeerEventsListener = peerEventsListener;
@@ -162,10 +159,10 @@ public class RTCSession implements PeerConnection.Observer {
     }
 
     public void setRemoteDescription (final SessionDescription sessionDescription) {
+        Log.d(TAG, "setRemoteDescription >>>>");
         mWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "setRemoteDescription...");
                 String sdpDescription = sessionDescription.description;
 
                 if (peerConnectionParameters.videoCallEnabled) {
@@ -184,8 +181,38 @@ public class RTCSession implements PeerConnection.Observer {
     }
 
     private void drainCandidates () {
+        Log.d(TAG, "drainCandidates!");
+        mWorkingExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (mQueuedRemoteCandidates != null) {
+                    Log.d(TAG, "Add remote candidates. Size: " + mQueuedRemoteCandidates.size());
+                    for (IceCandidate candidate : mQueuedRemoteCandidates) {
+                        mPeerConnection.addIceCandidate(candidate);
+                    }
+                }
+            }
+        });
+    }
+
+    public void closeSession () {
+        Log.d(TAG, "Close RTCSession!");
+        mWorkingExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (mDataChannel != null) {
+                    mDataChannel.dispose();
+                    mDataChannel = null;
+                }
+                if (mPeerConnection != null) {
+                    mPeerConnection.dispose();
+                    mPeerConnection = null;
+                }
+            }
+        });
 
     }
+
     /**
      * -------------------------------------------------------------------
      * -------------------------------------------------------------------
@@ -199,10 +226,10 @@ public class RTCSession implements PeerConnection.Observer {
 
     @Override
     public void onIceConnectionChange(final PeerConnection.IceConnectionState iceConnectionState) {
+        Log.d(TAG, "IceConnectionState: " + iceConnectionState);
         mWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "IceConnectionState: " + iceConnectionState);
                 mIceConnectionState = iceConnectionState;
                 switch (iceConnectionState) {
                     case CONNECTED:
@@ -230,8 +257,15 @@ public class RTCSession implements PeerConnection.Observer {
     }
 
     @Override
-    public void onIceCandidate(IceCandidate iceCandidate) {
+    public void onIceCandidate(final IceCandidate iceCandidate) {
         Log.d(TAG, "onIceCandidate: " + iceCandidate);
+        mWorkingExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                mPeerEventsListener.onIceCandidate(iceCandidate);
+            }
+        });
+
     }
 
     @Override

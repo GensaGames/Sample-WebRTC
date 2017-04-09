@@ -1,9 +1,6 @@
 package com.gensagames.samplewebrtc.view;
 
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -18,10 +15,10 @@ import android.view.MenuItem;
 import android.view.View;
 
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
-import com.gensagames.samplewebrtc.model.BTMessageItem;
 import com.gensagames.samplewebrtc.view.fragments.MainSliderFragment;
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.view.fragments.AboutFragment;
+import com.gensagames.samplewebrtc.view.helper.CollapseAppBarLayoutBehavior;
 import com.gensagames.samplewebrtc.view.helper.FragmentHeaderTransaction;
 
 public class MainActivity extends AppCompatActivity {
@@ -88,9 +85,11 @@ public class MainActivity extends AppCompatActivity {
 
         mCoordinatorLayout.removeView(mHeaderInstanceView);
         mHeaderInstanceView = getLayoutInflater().inflate(nextHeaderResource, null);
-        mCoordinatorLayout.addView(mHeaderInstanceView, insertIndex, new CoordinatorLayout.
+        CoordinatorLayout.LayoutParams params = new CoordinatorLayout.
                 LayoutParams(CoordinatorLayout.LayoutParams.MATCH_PARENT,
-                        CoordinatorLayout.LayoutParams.WRAP_CONTENT));
+                CoordinatorLayout.LayoutParams.WRAP_CONTENT);
+        params.setBehavior(new CollapseAppBarLayoutBehavior());
+        mCoordinatorLayout.addView(mHeaderInstanceView, insertIndex, params);
 
         setDrawerToggle();
         mFragmentManager.beginTransaction()

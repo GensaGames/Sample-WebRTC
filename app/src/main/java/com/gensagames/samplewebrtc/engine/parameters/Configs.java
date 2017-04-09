@@ -9,6 +9,8 @@ package com.gensagames.samplewebrtc.engine.parameters;
 public class Configs {
 
     public static final String GOOGLE_STUN_URI = "stun:stun.l.google.com:19302";
+    public static final String GOOGLE_STUN_URI_1 = "stun:stun1.l.google.com:19302";
+    public static final String SIPPHONE_STUN_URI = "stun:stun01.sipphone.com";
     public static final String VIDEO_TRACK_ID = "ARDAMSv0";
     public static final String AUDIO_TRACK_ID = "ARDAMSa0";
     public static final String VIDEO_TRACK_TYPE = "video";

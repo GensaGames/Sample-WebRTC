@@ -10,14 +10,14 @@ import android.view.View;
  * Created by GensaGames
  * GensaGames
  */
-public class DisableableAppBarLayoutBehavior extends AppBarLayout.Behavior {
+public class CollapseAppBarLayoutBehavior extends AppBarLayout.Behavior {
     private boolean mEnabled;
 
-    public DisableableAppBarLayoutBehavior() {
+    public CollapseAppBarLayoutBehavior() {
         super();
     }
 
-    public DisableableAppBarLayoutBehavior(Context context, AttributeSet attrs) {
+    public CollapseAppBarLayoutBehavior(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
@@ -26,8 +26,10 @@ public class DisableableAppBarLayoutBehavior extends AppBarLayout.Behavior {
     }
 
     @Override
-    public boolean onStartNestedScroll(CoordinatorLayout parent, AppBarLayout child, View directTargetChild, View target, int nestedScrollAxes) {
-        return mEnabled && super.onStartNestedScroll(parent, child, directTargetChild, target, nestedScrollAxes);
+    public boolean onStartNestedScroll(CoordinatorLayout parent, AppBarLayout child,
+                                       View directTargetChild, View target, int nestedScrollAxes) {
+        return mEnabled && super.onStartNestedScroll(parent, child, directTargetChild,
+                target, nestedScrollAxes);
     }
 
     public boolean isEnabled() {
