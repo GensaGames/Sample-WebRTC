@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.support.annotation.NonNull;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
@@ -14,9 +15,11 @@ import com.gensagames.samplewebrtc.signaling.helper.ConnectivityChangeListener;
 import com.gensagames.samplewebrtc.signaling.helper.MessageObservable;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import com.google.gson.stream.JsonReader;
 
 import org.webrtc.SessionDescription;
 
+import java.io.StringReader;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -50,41 +53,58 @@ public class BTSignalingObserver implements MessageObservable, ConnectivityChang
     }
 
     @Override
-    public void onReceiveMsg(byte[] msgBytes, int length) {
-        Log.d(TAG, "onReceiveMsg: " + new String(msgBytes));
-        handleIncomingMsg(new String(msgBytes, 0, length));
+    public void onReceiveMsg(String msg) {
+        Log.d(TAG, "onReceiveMsg: " + msg);
+        handleIncomingMsg(msg);
 
     }
 
     @Override
     public void onSentMsg(byte[] msgBytes) {
         Log.d(TAG, "onSentMsg: " + new String(msgBytes));
+        continueActions();
     }
 
 
-    public void setWorkingAddress(String address) {
-        mConnectAddress = address;
+    public void connectAddress(String address) {
+        if (TextUtils.isEmpty(address)) {
+            Log.e(TAG, "Empty address to connect");
+            return;
+        }
+        if (!address.equals(mConnectAddress)
+                || !mBluetoothService.getState().isWorking()) {
+            mConnectAddress = address;
+            mBluetoothService.connect(mAdapter.getRemoteDevice(address));
+
+        }
     }
 
     public boolean isConnected () {
         return mBluetoothService.getState() == BTConnectivityService.
                 ConnectionState.STATE_CONNECTED;
     }
+
     public BluetoothDevice getWorkingDevice() {
         return mBluetoothService.getWorkingDevice();
     }
 
-    public boolean sendWhenReady(@NonNull final Object object) {
+    public boolean sendWhenReady(@NonNull Object object) {
         final String msg;
         if (object instanceof String) {
             msg = (String) object;
-        } else {
-            msg = new Gson().toJson(object);
         }
+        else if (object instanceof SignalingMessageItem){
+            SignalingMessageItem signalingObject = (SignalingMessageItem) object;
+            msg = new Gson().toJson(signalingObject);
+        } else {
+            return false;
+        }
+
+        Log.d(TAG, "sendWhenReady MSG: " + msg);
         Runnable runnable = new Runnable() {
             @Override
             public void run() {
-                mBluetoothService.write(msg.getBytes());
+                mBluetoothService.write(msg);
             }
         };
         return listActionToDone.offer(runnable) && continueActions();
@@ -93,17 +113,22 @@ public class BTSignalingObserver implements MessageObservable, ConnectivityChang
     @Override
     public void onConnectivityStateChanged(BTConnectivityService.ConnectionState state) {
         switch (state) {
+            case STATE_DISCONNECTED:
+                connectAddress(mConnectAddress);
+                break;
             case STATE_CONNECTED:
             case STATE_LISTEN:
             case IDLE:
                 continueActions();
+                break;
         }
     }
 
     private void handleIncomingMsg (String msg) {
         try {
-            Gson gson = new Gson();
-            SignalingMessageItem btMsg = gson.fromJson(msg, SignalingMessageItem.class);
+            SignalingMessageItem btMsg = new Gson()
+                    .fromJson(msg, SignalingMessageItem.class);
+
             SignalingMessageItem.MessageType btMsgType = btMsg.getMessageType();
             Intent intent = null;
             if (btMsgType == SignalingMessageItem.MessageType.SDP_EXCHANGE) {
@@ -134,21 +159,22 @@ public class BTSignalingObserver implements MessageObservable, ConnectivityChang
 
 
     private boolean continueActions () {
-        if (mBluetoothService.getState() ==
-                BTConnectivityService.ConnectionState.IDLE) {
+        Log.d(TAG, "continueActions() called");
+        BTConnectivityService.ConnectionState state = mBluetoothService.getState();
+        if (state == BTConnectivityService.ConnectionState.IDLE) {
             mBluetoothService.start();
             return false;
         }
+        if (state != BTConnectivityService.ConnectionState.STATE_CONNECTED) {
+            Log.e(TAG, "Device not connected. Waiting.");
+            return false;
+        }
+
+        Log.d(TAG, "continueActions() ready to work");
         Runnable nextAction = listActionToDone.poll();
         if (nextAction == null) {
             return false;
         }
-        if (mBluetoothService.getState() !=
-                BTConnectivityService.ConnectionState.STATE_CONNECTED) {
-            mBluetoothService.connect(mAdapter.getRemoteDevice(mConnectAddress));
-            return false;
-        }
-
         try {
             nextAction.run();
         } catch (Exception ex) {

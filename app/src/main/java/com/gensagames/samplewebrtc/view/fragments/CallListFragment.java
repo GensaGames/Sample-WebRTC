@@ -101,6 +101,8 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     public void onDiscoveryStarted() {
         mTextRefresh.setVisibility(View.GONE);
         mSwipeRefreshLayout.setRefreshing(true);
+        mBtRecyclerAdapter.getWorkingItems().clear();
+        mBtRecyclerAdapter.notifyDataSetChanged();
     }
 
     @Override

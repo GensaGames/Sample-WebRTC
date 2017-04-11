@@ -200,14 +200,19 @@ public class RTCSession implements PeerConnection.Observer {
         mWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                if (mDataChannel != null) {
-                    mDataChannel.dispose();
-                    mDataChannel = null;
+                try {
+
+                    if (mDataChannel != null) {
+                        mDataChannel.dispose();
+                        mDataChannel = null;
+                    }
+                    if (mPeerConnection != null) {
+                        mPeerConnection.dispose();
+                        mPeerConnection = null;
+                    }
+                } catch (Exception ignored) {
                 }
-                if (mPeerConnection != null) {
-                    mPeerConnection.dispose();
-                    mPeerConnection = null;
-                }
+
             }
         });
 

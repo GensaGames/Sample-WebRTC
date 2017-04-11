@@ -13,10 +13,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
+import java.util.regex.Matcher;
 
 import static com.gensagames.samplewebrtc.signaling.BTConnectivityService.ConnectionState.IDLE;
 import static com.gensagames.samplewebrtc.signaling.BTConnectivityService.ConnectionState.STATE_CONNECTED;
 import static com.gensagames.samplewebrtc.signaling.BTConnectivityService.ConnectionState.STATE_CONNECTING;
+import static com.gensagames.samplewebrtc.signaling.BTConnectivityService.ConnectionState.STATE_DISCONNECTED;
 import static com.gensagames.samplewebrtc.signaling.BTConnectivityService.ConnectionState.STATE_LISTEN;
 
 /**
@@ -28,6 +30,9 @@ public class BTConnectivityService {
 
     private static final String TAG = BTConnectivityService.class.getSimpleName();
     private static final String SERVICE_NAME = BTConnectivityService.class.getSimpleName();
+
+    private static final String START_MSG_TAG = "<START>";
+    private static final String END_MSG_TAG = "<END>";
 
     private final BluetoothAdapter mAdapter;
     private final MessageObservable mMessageObservable;
@@ -45,7 +50,13 @@ public class BTConnectivityService {
         IDLE,
         STATE_LISTEN,
         STATE_CONNECTING,
-        STATE_CONNECTED
+        STATE_CONNECTED,
+        STATE_DISCONNECTED;
+
+        public boolean isWorking() {
+            return this == STATE_CONNECTED
+                    || this == STATE_CONNECTING;
+        }
     }
 
     public BTConnectivityService(MessageObservable messageObservable) {
@@ -175,10 +186,8 @@ public class BTConnectivityService {
 
     /**
      * Write to the MainSignalingTask in an unsynchronized manner
-     * @param out The bytes to write
-     * @see MainSignalingTask#write(byte[])
      */
-    public void write(byte[] out) {
+    public void write(String msg) {
         MainSignalingTask r;
         synchronized (this) {
             if (mState != STATE_CONNECTED) {
@@ -186,12 +195,13 @@ public class BTConnectivityService {
             }
             r = mMainSignalingTask;
         }
-        r.write(out);
+        String msgToSend = START_MSG_TAG + msg + END_MSG_TAG;
+        r.write(msgToSend.getBytes());
     }
 
     private void connectionFailed() {
         mWorkingDevice = null;
-        setState(STATE_LISTEN);
+        setState(STATE_DISCONNECTED);
     }
 
     /**
@@ -222,7 +232,6 @@ public class BTConnectivityService {
                 try {
                     socket = mmServerSocket.accept();
                 } catch (IOException e) {
-                    Log.e(TAG, "accept() failed", e);
                     break;
                 }
                 if (socket != null) {
@@ -282,7 +291,7 @@ public class BTConnectivityService {
                 mmSocket.connect();
             } catch (IOException e) {
                 Log.i(TAG, "Trying to connect failed! ", e);
-                connectionFailed();
+                setState(STATE_LISTEN);
                 try {
                     mmSocket.close();
                 } catch (IOException e2) {
@@ -310,6 +319,7 @@ public class BTConnectivityService {
      * It handles all incoming and outgoing transmissions.
      */
     private class MainSignalingTask extends Thread {
+        private String mMainMsgBuffer;
         private final BluetoothSocket mmSocket;
         private final InputStream mmInStream;
         private final OutputStream mmOutStream;
@@ -338,13 +348,34 @@ public class BTConnectivityService {
             while (true) {
                 try {
                     bytes = mmInStream.read(buffer);
-                    mMessageObservable.onReceiveMsg(buffer, bytes);
+                    mMainMsgBuffer+= new String(buffer, 0, bytes);
+                    mMainMsgBuffer = searchLocalMsg(mMainMsgBuffer);
                 } catch (IOException e) {
                     Log.e(TAG, "disconnected", e);
                     connectionFailed();
                     break;
                 }
             }
+        }
+
+        private String searchLocalMsg(String sourceMsg) {
+            Log.d(TAG, "searchLocalMsg from: " + sourceMsg);
+            try {
+                while (sourceMsg.contains(START_MSG_TAG)
+                        && sourceMsg.contains(END_MSG_TAG)) {
+                    int startIndex = sourceMsg.indexOf(START_MSG_TAG)
+                            + START_MSG_TAG.length();
+                    int endIndex = sourceMsg.indexOf(END_MSG_TAG);
+                    int endIndexToTrim = endIndex + END_MSG_TAG.length();
+
+                    String fireMsg = sourceMsg.substring(startIndex, endIndex);
+                    mMessageObservable.onReceiveMsg(fireMsg);
+                    sourceMsg = sourceMsg.substring(endIndexToTrim);
+                }
+            } catch (Exception ex) {
+                Log.e(TAG, "Error resolving incoming msg!", ex);
+            }
+            return sourceMsg;
         }
         /**
          * Write to the connected OutStream.

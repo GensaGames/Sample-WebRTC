@@ -6,6 +6,6 @@ package com.gensagames.samplewebrtc.signaling.helper;
  */
 
 public interface MessageObservable {
-    void onReceiveMsg (byte[] msgBytes, int length);
+    void onReceiveMsg (String msg);
     void onSentMsg (byte[] msgBytes);
 }

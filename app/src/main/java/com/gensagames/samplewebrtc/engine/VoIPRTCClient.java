@@ -94,10 +94,6 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
         return instance;
     }
 
-    public boolean isCreated () {
-        return mPeerFactory != null;
-    }
-
     public Executor getExecutor () {
         return mWorkingExecutor;
     }
@@ -200,7 +196,7 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
         * NOTE: this _must_ happen while |factory| is alive!
         */
         createMediaConstraints();
-        boolean isSuccessful = isCreated();
+        boolean isSuccessful = mPeerFactory != null;
         if (isSuccessful && mPeerConnectionParameters.tracing) {
             Logging.enableTracing(NATIVE_TRACE_USE, EnumSet.of
                     (Logging.TraceLevel.TRACE_DEFAULT));
@@ -220,7 +216,7 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
                                       @Nullable VideoCapturer videoCapturer,
                                       @Nullable VideoRenderer.Callbacks videoCallbackLocal,
                                       @Nullable List<VideoRenderer.Callbacks> videoCallbacksRemote) {
-        if (!isCreated()) {
+        if (mPeerFactory == null) {
             Log.e(TAG, "PeerConnection factory is not created");
             return;
         }

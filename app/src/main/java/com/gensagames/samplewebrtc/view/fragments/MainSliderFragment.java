@@ -70,6 +70,7 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
 
     private void handleCallDisconnected (SignalingMessageItem item) {
         enableCollapseToolbar(false);
+        mCollapsingLayout.setTitle(getString(R.string.app_name));
         mBtnAnswerView.setVisibility(View.GONE);
         mBtnHangupView.setVisibility(View.GONE);
     }
@@ -96,6 +97,8 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         enableCollapseToolbar(true);
         mBtnHangupView.setVisibility(View.VISIBLE);
         mBtnAnswerView.setVisibility(View.GONE);
+        mCollapsingLayout.setTitle(getString(R.string.state_connected_call,
+                item.getUserName()));
         mBtnHangupView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
