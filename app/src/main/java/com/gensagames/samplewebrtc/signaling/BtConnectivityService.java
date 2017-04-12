@@ -291,7 +291,6 @@ public class BTConnectivityService {
                 mmSocket.connect();
             } catch (IOException e) {
                 Log.i(TAG, "Trying to connect failed! ", e);
-                setState(STATE_LISTEN);
                 try {
                     mmSocket.close();
                 } catch (IOException e2) {
@@ -299,6 +298,7 @@ public class BTConnectivityService {
                             " during connection failure", e2);
                 }
                 BTConnectivityService.this.start();
+                connectionFailed();
                 return;
             }
             synchronized (BTConnectivityService.this) {

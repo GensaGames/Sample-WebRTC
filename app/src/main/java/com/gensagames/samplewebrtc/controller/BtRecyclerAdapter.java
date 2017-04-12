@@ -18,8 +18,8 @@ import java.util.List;
  * GensaGames
  */
 
-public class BtRecyclerAdapter extends RecyclerView.Adapter
-        <BtRecyclerAdapter.BluetoothDeviceHolder> {
+public class BTRecyclerAdapter extends RecyclerView.Adapter
+        <BTRecyclerAdapter.BluetoothDeviceHolder> {
 
     public interface OnItemClickListener {
         void onItemClick(int position);
@@ -28,7 +28,7 @@ public class BtRecyclerAdapter extends RecyclerView.Adapter
     private List<BluetoothDeviceItem> mBtDeviceItemList;
     private OnItemClickListener mOnItemClickListener;
 
-    public BtRecyclerAdapter() {
+    public BTRecyclerAdapter() {
         mBtDeviceItemList = new ArrayList<>();
     }
 
@@ -66,9 +66,9 @@ public class BtRecyclerAdapter extends RecyclerView.Adapter
             implements View.OnClickListener {
         public TextView deviceName;
         public TextView deviceInfo;
-        public BtRecyclerAdapter.OnItemClickListener onItemClickListener;
+        public BTRecyclerAdapter.OnItemClickListener onItemClickListener;
 
-        public BluetoothDeviceHolder(View itemView, BtRecyclerAdapter.
+        public BluetoothDeviceHolder(View itemView, BTRecyclerAdapter.
                 OnItemClickListener onItemClickListener) {
             super(itemView);
             itemView.setOnClickListener(this);

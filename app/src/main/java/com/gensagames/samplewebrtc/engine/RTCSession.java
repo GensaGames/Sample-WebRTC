@@ -7,7 +7,6 @@ import com.gensagames.samplewebrtc.engine.parameters.Configs;
 import com.gensagames.samplewebrtc.engine.parameters.PeerConnectionParameters;
 import com.gensagames.samplewebrtc.engine.utils.SdpConfig;
 
-import org.webrtc.AudioTrack;
 import org.webrtc.DataChannel;
 import org.webrtc.IceCandidate;
 import org.webrtc.MediaStream;
@@ -16,9 +15,9 @@ import org.webrtc.RtpReceiver;
 import org.webrtc.SdpObserver;
 import org.webrtc.SessionDescription;
 import org.webrtc.StatsReport;
-import org.webrtc.VideoTrack;
+import org.webrtc.VideoCapturer;
+import org.webrtc.VideoRenderer;
 
-import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -36,16 +35,21 @@ public class RTCSession implements PeerConnection.Observer {
     private PeerConnectionParameters peerConnectionParameters;
     private PeerConnection mPeerConnection;
     private PeerSdpObserver mSdpObserver;
-
     private DataChannel mDataChannel;
-    private AudioTrack mAudioTrack;
-    private VideoTrack mVideoTrack;
 
     private Executor mWorkingExecutor;
     private List<IceCandidate> mQueuedRemoteCandidates;
     private PeerConnection.IceConnectionState mIceConnectionState;
     private PeerEventsListener mPeerEventsListener;
     private SessionDescription mWorkingSdp;
+    /**
+     * For Video Support only
+     */
+    @Nullable
+    private VideoCapturer mVideoCapturer;
+    @Nullable
+    private VideoRenderer.Callbacks mVideoCallbackLocal;
+
     private long mSessionId;
     private boolean isInitiator;
 
@@ -90,19 +94,20 @@ public class RTCSession implements PeerConnection.Observer {
     }
 
     protected RTCSession() {
-        mSdpObserver = new PeerSdpObserver();
         mSessionId = UUID.randomUUID().getMostSignificantBits();
-        mWorkingExecutor = VoIPRTCClient.getInstance().getExecutor();
-        peerConnectionParameters = VoIPRTCClient.getInstance()
+        mSdpObserver = new PeerSdpObserver();
+        mWorkingExecutor = RTCClient.getInstance().getExecutor();
+        peerConnectionParameters = RTCClient.getInstance()
                 .getPeerConnectionParameters();
     }
 
     protected RTCSession configure(PeerConnection peerConnection, @Nullable DataChannel dataChannel,
-                                   AudioTrack audioTrack, @Nullable VideoTrack videoTrack) {
+                                   @Nullable VideoCapturer capturer,
+                                   @Nullable VideoRenderer.Callbacks callbacks) {
         mPeerConnection = peerConnection;
         mDataChannel = dataChannel;
-        mAudioTrack = audioTrack;
-        mVideoTrack = videoTrack;
+        mVideoCapturer = capturer;
+        mVideoCallbackLocal = callbacks;
         return this;
     }
 
@@ -140,8 +145,9 @@ public class RTCSession implements PeerConnection.Observer {
             @Override
             public void run() {
                 isInitiator = true;
+                Log.d(TAG, "Starting create offer!");
                 mPeerConnection.createOffer(mSdpObserver,
-                        VoIPRTCClient.getInstance().getSdpConstraints());
+                        RTCClient.getInstance().getSdpConstraints());
             }
         });
     }
@@ -153,7 +159,7 @@ public class RTCSession implements PeerConnection.Observer {
             public void run() {
                 isInitiator = false;
                 mPeerConnection.createAnswer(mSdpObserver,
-                        VoIPRTCClient.getInstance().getSdpConstraints());
+                        RTCClient.getInstance().getSdpConstraints());
             }
         });
     }
@@ -212,9 +218,9 @@ public class RTCSession implements PeerConnection.Observer {
                     }
                 } catch (Exception ignored) {
                 }
-
             }
         });
+        RTCClient.getInstance().cleanupMedia();
 
     }
 

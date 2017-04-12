@@ -91,6 +91,6 @@ public class PeerConnectionParameters {
         return new PeerConnectionParameters(false, iceServers, false, true, Configs.HD_VIDEO_WIDTH,
                 Configs.HD_VIDEO_HEIGHT, Configs.DEFAULT_FPS, Configs.DEFAULT_VIDEO_BITRATE,
                 Configs.CODEC_DEFAULT, true, true, Configs.AUDIO_START_BITRATE, Configs.CODEC_DEFAULT,
-                false, true, false, false, false, false, false, DataChannelParameters.getDefault());
+                false, false, false, false, false, false, false, DataChannelParameters.getDefault());
     }
 }

@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
@@ -41,9 +42,9 @@ import static com.gensagames.samplewebrtc.engine.parameters.Configs.*;
  * GensaGames
  */
 
-public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallback {
+public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallback {
 
-    private static final String TAG = VoIPRTCClient.class.getSimpleName();
+    private static final String TAG = RTCClient.class.getSimpleName();
     private static final String NATIVE_TRACE_USE = "logcat:";
     private static final String FILE_TRACE_NAME = "app-webrtc.txt";
     private static final String FILE_AUDIO_DUMP = "audio.aecdump";
@@ -52,10 +53,10 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
      * This might be optimized in generic way and conference supporting.
      * But for sample we can leave it.
      */
-    private static final String STREAM_UID = "App-Audio-Stream";
+    private static final String STREAM_UID = "App-Audio-Stream-1";
     private static final String DATA_CHANNEL_UID = "App-Data-Channel";
 
-    private static VoIPRTCClient instance;
+    private static RTCClient instance;
 
     private Executor mWorkingExecutor;
     private PeerConnectionFactory.Options mPeerFactoryOptions;
@@ -79,15 +80,15 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
         void onPeerCreated(RTCSession session);
     }
 
-    private VoIPRTCClient() {
+    private RTCClient() {
         mWorkingExecutor = Executors.newSingleThreadScheduledExecutor();
     }
 
-    public static VoIPRTCClient getInstance() {
+    public static RTCClient getInstance() {
         if (instance == null) {
-            synchronized (VoIPRTCClient.class) {
+            synchronized (RTCClient.class) {
                 if (instance == null) {
-                    instance = new VoIPRTCClient();
+                    instance = new RTCClient();
                 }
             }
         }
@@ -120,13 +121,7 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
         });
     }
 
-    /**
-     * For creation PeerConnection with Video enable, we should also use
-     * EglBase.Context renderEGLContext for PeerConnectionFactory
-     *
-     * PeerConnectionFactory.setVideoHwAccelerationOptions
-     * (renderEGLContext, renderEGLContext);
-     */
+
     public void createPeerConnection (@NonNull final PeerCreationListener peerCreationListener,
                                       @Nullable final EglBase.Context renderEGLContext,
                                       @Nullable final VideoCapturer videoCapturer,
@@ -141,6 +136,33 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
         });
     }
 
+    public void cleanupMedia () {
+        mWorkingExecutor.execute(new Runnable() {
+            @Override
+            public void run() {
+                cleanupMediaInternal();
+            }
+        });
+    }
+
+    private void cleanupMediaInternal () {
+        if (mAudioSource != null) {
+            mAudioSource.dispose();
+            mAudioSource = null;
+        }
+        if (mVideoSource != null) {
+            mVideoSource.dispose();
+            mVideoSource = null;
+        }
+        mMediaStream = null;
+    }
+    /**
+     * For creation PeerConnection with Video enable, we should also use
+     * EglBase.Context renderEGLContext for PeerConnectionFactory
+     *
+     * PeerConnectionFactory.setVideoHwAccelerationOptions
+     * (renderEGLContext, renderEGLContext);
+     */
     private void createPeerFactoryInternal(Context context,
                                            FactoryCreationListener factoryCreationListener) {
         PeerConnectionFactory.initializeInternalTracer();
@@ -184,7 +206,7 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
             WebRtcAudioUtils.setWebRtcBasedNoiseSuppressor(false);
         }
 
-        WebRtcAudioRecord.setErrorCallback(VoIPRTCClient.this);
+        WebRtcAudioRecord.setErrorCallback(RTCClient.this);
         if (PeerConnectionFactory.initializeAndroidGlobals(
                 context, true, false, mPeerConnectionParameters.videoCodecHwAcceleration)) {
             mPeerFactory = new PeerConnectionFactory(mPeerFactoryOptions);
@@ -202,6 +224,7 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
                     (Logging.TraceLevel.TRACE_DEFAULT));
             Logging.enableLogToDebugOutput(Logging.Severity.LS_INFO);
         }
+
         if (factoryCreationListener != null) {
             factoryCreationListener.onCreationDone(isSuccessful);
         }
@@ -223,8 +246,6 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
         RTCSession rtcSession = new RTCSession();
         PeerConnection peerConnection;
         DataChannel dataChannel = null;
-        VideoTrack videoTrack = null;
-        AudioTrack audioTrack;
 
         if (mPeerConnectionParameters.videoCallEnabled && renderEGLContext != null) {
             mPeerFactory.setVideoHwAccelerationOptions(renderEGLContext, renderEGLContext);
@@ -255,22 +276,16 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
             init.maxRetransmitTimeMs = mPeerConnectionParameters.dataChannelParameters.maxRetransmitTimeMs;
             init.id = mPeerConnectionParameters.dataChannelParameters.id;
             init.protocol = mPeerConnectionParameters.dataChannelParameters.protocol;
-            dataChannel = peerConnection.createDataChannel(DATA_CHANNEL_UID, init);
+            dataChannel = peerConnection.createDataChannel(String.valueOf(UUID.randomUUID()
+                    .getMostSignificantBits()), init);
             Log.d(TAG, "Created PeerConnection - DataChannel!");
         }
         /*
          * Checking Media Sources (Audio and Video), and
          * create/add them to the main MediaStream
          */
-        checkAndCreateStream(videoCapturer);
-        if (mPeerConnectionParameters.videoCallEnabled && videoCapturer != null
-                && videoCallbackLocal != null) {
-            videoTrack = createVideoTrack(videoCapturer, videoCallbackLocal);
-            findVideoSender(peerConnection);
-            mMediaStream.addTrack(videoTrack);
-        }
-        audioTrack = createAudioTrack();
-        mMediaStream.addTrack(audioTrack);
+        Log.d(TAG, "Check and create Media...");
+        checkAndCreateMedia(videoCapturer, videoCallbackLocal);
 
         if (mPeerConnectionParameters.aecDump) {
             try {
@@ -283,50 +298,50 @@ public class VoIPRTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCa
                 Log.e(TAG, "Can not open aecdump file!", e);
             }
         }
+        Log.d(TAG, "Adding stream!");
         peerConnection.addStream(mMediaStream);
         peerCreationListener.onPeerCreated(rtcSession.configure
-                (peerConnection, dataChannel, audioTrack, videoTrack));
+                (peerConnection, dataChannel, videoCapturer, videoCallbackLocal));
     }
 
 
 
-    private void checkAndCreateStream (@Nullable VideoCapturer videoCapturer) {
+    private void checkAndCreateMedia(VideoCapturer videoCapturer,
+                                     VideoRenderer.Callbacks videoCallbackLocal) {
         if (mMediaStream == null) {
-            mMediaStream = mPeerFactory.createLocalMediaStream(STREAM_UID);
+            mMediaStream = mPeerFactory.createLocalMediaStream(String
+                    .valueOf(UUID.randomUUID().getMostSignificantBits()));
         }
         if (mAudioSource == null) {
             mAudioSource = mPeerFactory.createAudioSource(mAudioConstraints);
         }
-        if (mPeerConnectionParameters.videoCallEnabled
-                && mVideoSource == null && videoCapturer != null) {
+        if (mPeerConnectionParameters.videoCallEnabled && mVideoSource == null) {
             mVideoSource = mPeerFactory.createVideoSource(videoCapturer);
         }
-    }
 
-    private AudioTrack createAudioTrack() {
-        AudioTrack audioTrack = mPeerFactory.createAudioTrack(AUDIO_TRACK_ID, mAudioSource);
+        if (mPeerConnectionParameters.videoCallEnabled) {
+            videoCapturer.startCapture(mPeerConnectionParameters.videoWidth,
+                    mPeerConnectionParameters.videoHeight, mPeerConnectionParameters.videoFps);
+
+            VideoTrack videoTrack = mPeerFactory.createVideoTrack(String.valueOf
+                    (UUID.randomUUID().getMostSignificantBits()), mVideoSource);
+            videoTrack.addRenderer(new VideoRenderer(videoCallbackLocal));
+            videoTrack.setEnabled(true);
+            mMediaStream.addTrack(videoTrack);
+        }
+
+        AudioTrack audioTrack = mPeerFactory.createAudioTrack(String
+                .valueOf(UUID.randomUUID().getMostSignificantBits()), mAudioSource);
         audioTrack.setEnabled(true);
-        return audioTrack;
+        mMediaStream.addTrack(audioTrack);
     }
 
     /**
      * Only for video configuration!
-     */
-    private VideoTrack createVideoTrack(@NonNull VideoCapturer capturer,
-                                        @NonNull VideoRenderer.Callbacks callbacks) {
-        capturer.startCapture(mPeerConnectionParameters.videoWidth,
-                mPeerConnectionParameters.videoHeight, mPeerConnectionParameters.videoFps);
-
-        VideoTrack videoTrack = mPeerFactory.createVideoTrack(VIDEO_TRACK_ID, mVideoSource);
-        videoTrack.setEnabled(true);
-        videoTrack.addRenderer(new VideoRenderer(callbacks));
-        return videoTrack;
-    }
-
-    /**
-     * Only for video configuration!
+     * TODO(Video) Use this method (Based on Chromium sample)
      */
     @Nullable
+    @SuppressWarnings("unused")
     private RtpSender findVideoSender(@NonNull PeerConnection peerConnection) {
         for (RtpSender sender : peerConnection.getSenders()) {
             if (sender.track() != null) {

@@ -23,13 +23,14 @@ import android.view.ViewGroup;
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
 import com.gensagames.samplewebrtc.controller.BTMonitorController;
-import com.gensagames.samplewebrtc.controller.BtRecyclerAdapter;
+import com.gensagames.samplewebrtc.controller.BTRecyclerAdapter;
+import com.gensagames.samplewebrtc.model.CallSessionItem;
 import com.gensagames.samplewebrtc.signaling.helper.OnBluetoothResponse;
 import com.gensagames.samplewebrtc.model.BluetoothDeviceItem;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
 
 public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnRefreshListener,
-        OnBluetoothResponse, OnSliderPageSelected, BtRecyclerAdapter.OnItemClickListener {
+        OnBluetoothResponse, OnSliderPageSelected, BTRecyclerAdapter.OnItemClickListener {
 
     private static final String TAG = CallListFragment.class.getSimpleName();
 
@@ -37,7 +38,7 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     private RecyclerView mRecyclerView;
     private SwipeRefreshLayout mSwipeRefreshLayout;
 
-    private BtRecyclerAdapter mBtRecyclerAdapter;
+    private BTRecyclerAdapter mBTRecyclerAdapter;
     private BTMonitorController mBluetoothMonitorController;
 
     @Override
@@ -85,7 +86,7 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     @Override
     public void onItemClick(int position) {
         Log.d(TAG, "OnItemClick..");
-        BluetoothDeviceItem item = mBtRecyclerAdapter
+        BluetoothDeviceItem item = mBTRecyclerAdapter
                 .getWorkingItems().get(position);
         getDialogForSignalingCall(getString(R.string.dialog_tittle_make_call), getString(R
                 .string.dialog_msg_make_call, item.getDeviceName()), item)
@@ -101,8 +102,8 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     public void onDiscoveryStarted() {
         mTextRefresh.setVisibility(View.GONE);
         mSwipeRefreshLayout.setRefreshing(true);
-        mBtRecyclerAdapter.getWorkingItems().clear();
-        mBtRecyclerAdapter.notifyDataSetChanged();
+        mBTRecyclerAdapter.getWorkingItems().clear();
+        mBTRecyclerAdapter.notifyDataSetChanged();
     }
 
     @Override
@@ -114,9 +115,9 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
 
     @Override
     public void onDiscovery(@NonNull BluetoothDevice device) {
-        mBtRecyclerAdapter.getWorkingItems().add(BluetoothDeviceItem.
+        mBTRecyclerAdapter.getWorkingItems().add(BluetoothDeviceItem.
                 createFromBT(device, getString(R.string.name_unknown)));
-        mBtRecyclerAdapter.notifyDataSetChanged();
+        mBTRecyclerAdapter.notifyDataSetChanged();
 
     }
 
@@ -127,19 +128,20 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
         mRecyclerView.setLayoutManager(mLayoutManager);
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
 
-        mBtRecyclerAdapter = new BtRecyclerAdapter();
-        mBtRecyclerAdapter.setOnItemClickListener(this);
-        mRecyclerView.setAdapter(mBtRecyclerAdapter);
-        mBtRecyclerAdapter.notifyDataSetChanged();
+        mBTRecyclerAdapter = new BTRecyclerAdapter();
+        mBTRecyclerAdapter.setOnItemClickListener(this);
+        mRecyclerView.setAdapter(mBTRecyclerAdapter);
+        mBTRecyclerAdapter.notifyDataSetChanged();
     }
 
     private void startSignalingCall (@NonNull BluetoothDeviceItem device) {
-        Log.d(TAG, "startSignalingCall to Device: " + device.getDeviceName());
+        Log.d(TAG, "startSignalingCall to Device!");
         mBluetoothMonitorController.cancelSearch();
         Activity activityContext = getActivity();
         Intent intent = new Intent(VoIPEngineService.ACTION_START_CALL, Uri.EMPTY,
                 activityContext, VoIPEngineService.class);
-        intent.putExtra(VoIPEngineService.EXTRA_DEVICE_ITEM, device);
+        intent.putExtra(VoIPEngineService.EXTRA_CALL_SESSION,
+                new CallSessionItem(device.getDeviceName(), device.getDeviceAddress()));
         activityContext.startService(intent);
     }
 

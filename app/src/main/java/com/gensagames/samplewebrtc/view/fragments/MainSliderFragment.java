@@ -17,15 +17,13 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
-import android.support.v7.widget.Toolbar;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
-import com.gensagames.samplewebrtc.model.BluetoothDeviceItem;
-import com.gensagames.samplewebrtc.model.SignalingMessageItem;
+import com.gensagames.samplewebrtc.model.CallSessionItem;
 import com.gensagames.samplewebrtc.view.helper.CollapseAppBarLayoutBehavior;
 import com.gensagames.samplewebrtc.view.helper.FragmentHeaderTransaction;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
@@ -68,17 +66,17 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         getActivity().unregisterReceiver(mIncomingCallReceiver);
     }
 
-    private void handleCallDisconnected (SignalingMessageItem item) {
+    private void handleCallDisconnected (CallSessionItem item) {
         enableCollapseToolbar(false);
         mCollapsingLayout.setTitle(getString(R.string.app_name));
         mBtnAnswerView.setVisibility(View.GONE);
         mBtnHangupView.setVisibility(View.GONE);
     }
 
-    private void handleOutgoingCall (final BluetoothDeviceItem item) {
+    private void handleOutgoingCall (final CallSessionItem item) {
         enableCollapseToolbar(true);
         mCollapsingLayout.setTitle(getString(R.string.state_outgoing_call,
-                item.getDeviceName()));
+                item.getRemoteName()));
         mBtnHangupView.setVisibility(View.VISIBLE);
         mBtnAnswerView.setVisibility(View.GONE);
         mBtnHangupView.setOnClickListener(new View.OnClickListener() {
@@ -87,34 +85,34 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
                 Activity activity = getActivity();
                 Intent intent = new Intent(VoIPEngineService.ACTION_HANGUP_CALL, Uri.EMPTY,
                         activity, VoIPEngineService.class);
-                intent.putExtra(VoIPEngineService.EXTRA_SIGNAL_MSG, item);
+                intent.putExtra(VoIPEngineService.EXTRA_CALL_SESSION, item);
                 activity.startService(intent);
             }
         });
     }
 
-    private void handleCallConnected (final SignalingMessageItem item) {
+    private void handleCallConnected (final CallSessionItem item) {
         enableCollapseToolbar(true);
         mBtnHangupView.setVisibility(View.VISIBLE);
         mBtnAnswerView.setVisibility(View.GONE);
         mCollapsingLayout.setTitle(getString(R.string.state_connected_call,
-                item.getUserName()));
+                item.getRemoteName()));
         mBtnHangupView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 Activity activity = getActivity();
                 Intent intent = new Intent(VoIPEngineService.ACTION_HANGUP_CALL, Uri.EMPTY,
                         activity, VoIPEngineService.class);
-                intent.putExtra(VoIPEngineService.EXTRA_SIGNAL_MSG, item);
+                intent.putExtra(VoIPEngineService.EXTRA_CALL_SESSION, item);
                 activity.startService(intent);
             }
         });
     }
 
-    private void handleIncomingCall(final SignalingMessageItem item) {
+    private void handleIncomingCall(final CallSessionItem item) {
         enableCollapseToolbar(true);
         mCollapsingLayout.setTitle(getString(R.string.state_incoming_call,
-                item.getUserName()));
+                item.getRemoteName()));
         mBtnAnswerView.setVisibility(View.VISIBLE);
         mBtnAnswerView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -122,7 +120,7 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
                 Activity activity = getActivity();
                 Intent intent = new Intent(VoIPEngineService.ACTION_ANSWER_CALL, Uri.EMPTY,
                         activity, VoIPEngineService.class);
-                intent.putExtra(VoIPEngineService.EXTRA_SIGNAL_MSG, item);
+                intent.putExtra(VoIPEngineService.EXTRA_CALL_SESSION, item);
                 activity.startService(intent);
             }
         });
@@ -194,22 +192,21 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         @Override
         public void onReceive(Context context, Intent intent) {
             String action = intent.getAction();
-            SignalingMessageItem item = (SignalingMessageItem) intent
-                    .getSerializableExtra(VoIPEngineService.EXTRA_SIGNAL_MSG);
-            BluetoothDeviceItem deviceItem = (BluetoothDeviceItem) intent
-                    .getSerializableExtra(VoIPEngineService.EXTRA_DEVICE_ITEM);
+            CallSessionItem session = (CallSessionItem) intent
+                    .getSerializableExtra(VoIPEngineService.EXTRA_CALL_SESSION);
+
             switch (action) {
                 case VoIPEngineService.NOTIFY_INCOMING_CALL:
-                    handleIncomingCall(item);
+                    handleIncomingCall(session);
                     break;
                 case VoIPEngineService.NOTIFY_CALL_CONNECTED:
-                    handleCallConnected(item);
+                    handleCallConnected(session);
                     break;
                 case VoIPEngineService.NOTIFY_CALL_DISCONNECTED:
-                    handleCallDisconnected(item);
+                    handleCallDisconnected(session);
                     break;
                 case VoIPEngineService.NOTIFY_OUTGOING_CALL:
-                    handleOutgoingCall(deviceItem);
+                    handleOutgoingCall(session);
                     break;
             }
         }
