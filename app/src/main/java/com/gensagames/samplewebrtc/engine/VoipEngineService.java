@@ -48,6 +48,7 @@ public class VoIPEngineService extends Service {
     public static final String NOTIFY_OUTGOING_CALL = "notify.outgoing.call";
     public static final String NOTIFY_CALL_CONNECTED = "notify.call.connected";
     public static final String NOTIFY_CALL_DISCONNECTED = "notify.call.disconnected";
+    public static final String NOTIFY_SIGNAL_MSG = "notify.signaling.msg";
 
     private Map<Long, SessionInfoHolder> mSessionMap;
     private BTSignalingObserver mBtSignalingObserver;
@@ -86,7 +87,7 @@ public class VoIPEngineService extends Service {
                         .getSerializableExtra(EXTRA_CALL_SESSION));
                 break;
             case ACTION_OFFER_SDP:
-                handleIncomingCall((SignalingMessageItem) intent
+                incomingCall((SignalingMessageItem) intent
                         .getSerializableExtra(EXTRA_SIGNAL_MSG));
                 break;
             case ACTION_ANSWER_SDP:
@@ -106,7 +107,7 @@ public class VoIPEngineService extends Service {
 
     /**
      * Closing session including, which is not created yet
-     * TODO(Items) Optimize objects to renegotiate!
+     * TODO(Conference) Optimize this for Conference!
      */
     private synchronized void hangupCall (Object item) {
         if (mSessionMap.isEmpty()) {
@@ -142,7 +143,12 @@ public class VoIPEngineService extends Service {
         }
     }
 
-    private synchronized void handleIncomingCall(SignalingMessageItem signalingMsg) {
+    /**
+     * Just creation SessionInfoHolder and proceed with notificaion.
+     * Nothing interesting.
+     * @param signalingMsg
+     */
+    private synchronized void incomingCall(SignalingMessageItem signalingMsg) {
         final BluetoothDevice device = mBtSignalingObserver.getWorkingDevice();
         if (!mBtSignalingObserver.isConnected() && device == null) {
             Log.e(TAG, "Bluetooth disconnected! Cannot handle call.");
@@ -164,6 +170,11 @@ public class VoIPEngineService extends Service {
     }
 
 
+    /**
+     * Handle remote SDP Answer. (Our outgoing call was answered)
+     * Need to save as Remote Description.
+     * @param item
+     */
     private synchronized void answerOutgoingCall(SignalingMessageItem item) {
         SessionInfoHolder holder = mSessionMap.get(item.getPeerSessionId());
         holder.addSignalingMsg(item);
@@ -261,6 +272,17 @@ public class VoIPEngineService extends Service {
     }
 
     /**
+     * Some changes for sending Signaling message, with RTC Events.
+     * USED JUST FOR SAMPLE, TO SHOW RENEGOTIATION
+     */
+    private void notifySignalingMsg (SignalingMessageItem item) {
+        Log.d(TAG, "notifyCallDisconnected... ");
+        Intent intent = new Intent(NOTIFY_SIGNAL_MSG);
+        intent.putExtra(EXTRA_SIGNAL_MSG, item);
+        getApplicationContext().sendBroadcast(intent);
+    }
+
+    /**
      * **********************************************************
      * Main Handler for all PeerConnection Events.
      * Control specific behavior here.
@@ -291,15 +313,11 @@ public class VoIPEngineService extends Service {
             signalingCandidate(candidate);
         }
 
-
         @Override
         public void onIceCandidatesRemoved(IceCandidate[] candidates) {
             Log.d(TAG, "onIceCandidatesRemoved");
         }
-        /**
-         * TODO(Items) Improve handling Item types
-         * During sending updates about session
-         */
+
         @Override
         public void onIceConnected() {
             Log.d(TAG, "onIceConnected");
@@ -314,7 +332,7 @@ public class VoIPEngineService extends Service {
             Log.d(TAG, "onIceDisconnected");
             CallSessionItem item  = mSessionMap.get(mSessionId).getCallSessionItem();
             item.setConnectionState(CallSessionItem.CallState.DISCONNECTED);
-            notifyCallConnected(item);
+            notifyCallDisconnected(item);
         }
 
         @Override
@@ -340,6 +358,7 @@ public class VoIPEngineService extends Service {
         }
     }
 
+
     private class SessionInfoHolder {
 
         private RTCSession session;
@@ -347,41 +366,39 @@ public class VoIPEngineService extends Service {
         private SessionDescription remoteSdp;
         private List<IceCandidate> remoteIceCandidates = new LinkedList<>();
 
-        public RTCSession getSession() {
+        private RTCSession getSession() {
             return session;
         }
 
-        public void setRTCSession(RTCSession session) {
+        private void setRTCSession(RTCSession session) {
             this.session = session;
         }
-        public void setCallSession(CallSessionItem item) {
+
+        private void setCallSession(CallSessionItem item) {
             this.callSessionItem = item;
         }
 
-        public SessionDescription getRemoteSdp() {
+        private SessionDescription getRemoteSdp() {
             return remoteSdp;
         }
 
-        public void setRemoteSdp(SessionDescription remoteSdp) {
+        private void setRemoteSdp(SessionDescription remoteSdp) {
             this.remoteSdp = remoteSdp;
         }
 
-        public List<IceCandidate> getRemoteIceCandidates() {
+        private List<IceCandidate> getRemoteIceCandidates() {
             return remoteIceCandidates;
         }
-        public void addSignalingMsg(SignalingMessageItem signalingMsg) {
 
-        }
-
-        public CallSessionItem getCallSessionItem() {
+        private CallSessionItem getCallSessionItem() {
             return callSessionItem;
         }
-    }
 
-    /**
-     * ************************************************************
-     * Some changes for sending Signaling message, with RTC Events.
-     * USED JUST FOR SAMPLE, TO SHOW RENEGOTIATION
-     */
+
+        private void addSignalingMsg(SignalingMessageItem signalingMsg) {
+            notifySignalingMsg(signalingMsg);
+        }
+
+    }
 
 }

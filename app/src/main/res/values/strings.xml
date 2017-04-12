@@ -15,11 +15,12 @@
     <string name="swipe_refresh_tip">Pull down to update List…</string>
     <string name="dialog_tittle_make_call">Make Call</string>
     <string name="dialog_msg_make_call">Make Bluetooth Signaling Call to the User - %1$s</string>
-    <string name="button_answer_call">Answer Call!</string>
-    <string name="button_hangup_call">Hangup Call!</string>
-    <string name="state_outgoing_call">Calling %1$s</string>
-    <string name="state_incoming_call">Incoming call %1$s</string>
-    <string name="state_connected_call">Connected %1$s</string>
+    <string name="button_answer_call">Answer</string>
+    <string name="button_hangup_call">Hangup</string>
+    <string name="state_outgoing_call">Calling…</string>
+    <string name="state_incoming_call">Incoming call!</string>
+    <string name="state_connected_call">Connected</string>
+    <string name="state_idle">Waiting connection…</string>
 
 
     <!-- Other -->

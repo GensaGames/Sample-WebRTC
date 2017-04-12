@@ -114,7 +114,6 @@ public class BTSignalingObserver implements MessageObservable, ConnectivityChang
     public void onConnectivityStateChanged(BTConnectivityService.ConnectionState state) {
         switch (state) {
             case STATE_DISCONNECTED:
-                connectAddress(mConnectAddress);
                 break;
             case STATE_CONNECTED:
             case STATE_LISTEN:

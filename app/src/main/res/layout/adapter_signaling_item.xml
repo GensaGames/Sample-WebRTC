@@ -12,16 +12,11 @@
         android:padding="12dp">
 
         <TextView
+            android:id="@+id/adapterSignalingMsg"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Lorem ipsum"
             android:textSize="20sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="With the new Design support library for Android, it has become easier for us to create some great animations with minimal effort , CollapsingToolbarLayout is the newly introduced in Lollipop , using which you can create awesome scrolling effects .According to the android documentation  CollapsingToolbarLayout is a wrapper for Toolbar which implements a collapsing app bar. It is designed to be used as a direct child of a AppBarLayout"
-            android:textSize="18sp" />
 
     </LinearLayout>
 

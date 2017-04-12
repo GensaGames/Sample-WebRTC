@@ -17,9 +17,12 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import com.gensagames.samplewebrtc.R;
 import com.gensagames.samplewebrtc.engine.VoIPEngineService;
@@ -29,7 +32,7 @@ import com.gensagames.samplewebrtc.view.helper.FragmentHeaderTransaction;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
 
 public class MainSliderFragment extends Fragment implements FragmentHeaderTransaction,
-        ViewPager.OnPageChangeListener {
+        ViewPager.OnPageChangeListener, AppBarLayout.OnOffsetChangedListener {
 
     private View mBtnAnswerView;
     private View mBtnHangupView;
@@ -41,6 +44,10 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
     private LocalFragmentAdapter mLocalFragmentAdapter;
     private IncomingCallReceiver mIncomingCallReceiver;
 
+    private View mCollapsingParent;
+    private TextView mCollapsingText1;
+    private TextView mCollapsingText2;
+
     @Nullable
     @Override
     @SuppressLint("InflateParams")
@@ -50,7 +57,12 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
                 findViewById(R.id.headerAppBarLayout);
         mCollapsingLayout = (CollapsingToolbarLayout) getActivity().
                 findViewById(R.id.headerCollapsingToolbar);
+
         mTabLayout = (TabLayout) getActivity().findViewById(R.id.tabs);
+        mCollapsingParent =  getActivity().findViewById(R.id.fragmentCollapsingTextParent);
+        mCollapsingText1 = (TextView) getActivity().findViewById(R.id.collapsingText1);
+        mCollapsingText2 = (TextView) getActivity().findViewById(R.id.collapsingText2);
+
         mViewPager = (ViewPager) x.findViewById(R.id.viewpager);
         mBtnAnswerView = x.findViewById(R.id.fragmentBtnAnswer);
         mBtnHangupView = x.findViewById(R.id.fragmentBtnHangup);
@@ -68,15 +80,22 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
 
     private void handleCallDisconnected (CallSessionItem item) {
         enableCollapseToolbar(false);
-        mCollapsingLayout.setTitle(getString(R.string.app_name));
+        mBtnHangupView.setEnabled(false);
+        mBtnAnswerView.setEnabled(false);
+        mCollapsingText1.setText(getString(R.string.app_name));
+        mCollapsingText2.setText(getString(R.string.state_idle));
+
         mBtnAnswerView.setVisibility(View.GONE);
         mBtnHangupView.setVisibility(View.GONE);
     }
 
     private void handleOutgoingCall (final CallSessionItem item) {
         enableCollapseToolbar(true);
-        mCollapsingLayout.setTitle(getString(R.string.state_outgoing_call,
-                item.getRemoteName()));
+        mBtnHangupView.setEnabled(true);
+        mBtnAnswerView.setEnabled(false);
+        mCollapsingText1.setText(item.getRemoteName());
+        mCollapsingText2.setText(getString(R.string.state_outgoing_call));
+
         mBtnHangupView.setVisibility(View.VISIBLE);
         mBtnAnswerView.setVisibility(View.GONE);
         mBtnHangupView.setOnClickListener(new View.OnClickListener() {
@@ -93,10 +112,13 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
 
     private void handleCallConnected (final CallSessionItem item) {
         enableCollapseToolbar(true);
+        mBtnHangupView.setEnabled(true);
+        mBtnAnswerView.setEnabled(false);
+        mCollapsingText1.setText(item.getRemoteName());
+        mCollapsingText2.setText(getString(R.string.state_connected_call));
+
         mBtnHangupView.setVisibility(View.VISIBLE);
         mBtnAnswerView.setVisibility(View.GONE);
-        mCollapsingLayout.setTitle(getString(R.string.state_connected_call,
-                item.getRemoteName()));
         mBtnHangupView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -111,8 +133,11 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
 
     private void handleIncomingCall(final CallSessionItem item) {
         enableCollapseToolbar(true);
-        mCollapsingLayout.setTitle(getString(R.string.state_incoming_call,
-                item.getRemoteName()));
+        mBtnHangupView.setEnabled(false);
+        mBtnAnswerView.setEnabled(true);
+        mCollapsingText1.setText(item.getRemoteName());
+        mCollapsingText2.setText(getString(R.string.state_incoming_call));
+
         mBtnAnswerView.setVisibility(View.VISIBLE);
         mBtnAnswerView.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -151,11 +176,32 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
 
     private void setupViewPager () {
         enableCollapseToolbar(false);
+        mCollapsingLayout.setTitle("");
+        mCollapsingText1.setText(getString(R.string.app_name));
+        mCollapsingText2.setText(getString(R.string.state_idle));
+
+        mAppBarLayout.addOnOffsetChangedListener(this);
         mLocalFragmentAdapter = new LocalFragmentAdapter(getChildFragmentManager());
         mViewPager.setAdapter(mLocalFragmentAdapter);
 
         mViewPager.addOnPageChangeListener(this);
         mTabLayout.setupWithViewPager(mViewPager);
+    }
+
+    @Override
+    public void onOffsetChanged(AppBarLayout appBarLayout, int verticalOffset) {
+        int totalScroll = appBarLayout.getTotalScrollRange();
+        float currentScrollPercentage = (float) Math.abs(verticalOffset)
+                / totalScroll;
+        float updatedScale = 1.2f +
+                ((1 - currentScrollPercentage) * 1.0f);
+        mCollapsingParent.setTranslationY((totalScroll - Math.abs(verticalOffset) +
+                (1 - currentScrollPercentage) * 100 * -1));
+        mCollapsingParent.setTranslationX((totalScroll - Math.abs(verticalOffset)) / 4);
+
+        mCollapsingParent.setScaleX(updatedScale);
+        mCollapsingParent.setScaleY(updatedScale);
+
     }
 
     @Override
