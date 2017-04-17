@@ -3,7 +3,9 @@ package com.gensagames.samplewebrtc.engine;
 import android.app.Service;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
@@ -50,12 +52,15 @@ public class VoIPEngineService extends Service {
     public static final String NOTIFY_CALL_DISCONNECTED = "notify.call.disconnected";
     public static final String NOTIFY_SIGNAL_MSG = "notify.signaling.msg";
 
+
+    private Handler mLocalUiHandler;
     private Map<Long, SessionInfoHolder> mSessionMap;
     private BTSignalingObserver mBtSignalingObserver;
 
     @Override
     public void onCreate() {
         super.onCreate();
+        mLocalUiHandler = new Handler(Looper.getMainLooper());
         mSessionMap = new LinkedHashMap<>();
         mBtSignalingObserver = new BTSignalingObserver(getApplicationContext());
 
@@ -124,23 +129,22 @@ public class VoIPEngineService extends Service {
     }
 
     private synchronized void handleIncomingCandidates (SignalingMessageItem item) {
-        SessionInfoHolder holder = mSessionMap.get(item.getPeerSessionId());
         if (item.getCandidates() == null) {
             Log.e(TAG, "Received Null IceCandidate!");
             return;
         }
+        SessionInfoHolder holder = mSessionMap.get(item.getPeerSessionId());
         if (holder == null) {
-            Log.e(TAG, "Received IceCandidate on empty Session!");
-            return;
+            holder = new SessionInfoHolder();
+            mSessionMap.put(item.getPeerSessionId(), holder);
         }
-        holder.addSignalingMsg(item);
-        List<IceCandidate> list = holder.getRemoteIceCandidates();
-        list.addAll(item.getCandidates());
-
+        holder.getRemoteIceCandidates().addAll(item.getCandidates());
         RTCSession session = holder.getSession();
         if (session != null) {
-            session.setRemoteCandidates(list);
+            session.setRemoteCandidates(item.getCandidates());
         }
+
+        holder.addSignalingMsg(item);
     }
 
     /**
@@ -155,18 +159,21 @@ public class VoIPEngineService extends Service {
             return;
         }
         long sessionId = signalingMsg.getPeerSessionId();
-        SessionInfoHolder holder = new SessionInfoHolder();
-        mSessionMap.put(sessionId, holder);
+        SessionInfoHolder holder = mSessionMap.get(sessionId);
+        if (holder == null) {
+            holder = new SessionInfoHolder();
+            mSessionMap.put(sessionId, holder);
+        }
 
         CallSessionItem item = new CallSessionItem(signalingMsg.getUserName(), sessionId,
                 CallSessionItem.CallState.INCOMING);
         item.setBluetoothAddress(device.getAddress());
 
-        holder.addSignalingMsg(signalingMsg);
         holder.setRemoteSdp(signalingMsg.getWorkingSdp());
         holder.setCallSession(item);
 
         notifyIncomingCall(item);
+        holder.addSignalingMsg(signalingMsg);
     }
 
 
@@ -177,7 +184,6 @@ public class VoIPEngineService extends Service {
      */
     private synchronized void answerOutgoingCall(SignalingMessageItem item) {
         SessionInfoHolder holder = mSessionMap.get(item.getPeerSessionId());
-        holder.addSignalingMsg(item);
 
         RTCSession session = holder.getSession();
         if (session == null) {
@@ -185,6 +191,7 @@ public class VoIPEngineService extends Service {
             return;
         }
         session.setRemoteDescription(item.getWorkingSdp());
+        holder.addSignalingMsg(item);
     }
 
     /**
@@ -213,7 +220,7 @@ public class VoIPEngineService extends Service {
     /**
      * Create connection for bluetooth, and just send raw data, as ping!
      * Started action for RTCClient to create PeerConnection.
-     * @param device - device to connect signaling
+     * @param item - device to connect signaling
      */
     private synchronized void startCall (@NonNull final CallSessionItem item) {
         mBtSignalingObserver.connectAddress(item.getBluetoothAddress());
@@ -276,7 +283,7 @@ public class VoIPEngineService extends Service {
      * USED JUST FOR SAMPLE, TO SHOW RENEGOTIATION
      */
     private void notifySignalingMsg (SignalingMessageItem item) {
-        Log.d(TAG, "notifyCallDisconnected... ");
+        Log.d(TAG, "notifySignalingMsg... ");
         Intent intent = new Intent(NOTIFY_SIGNAL_MSG);
         intent.putExtra(EXTRA_SIGNAL_MSG, item);
         getApplicationContext().sendBroadcast(intent);
@@ -347,7 +354,7 @@ public class VoIPEngineService extends Service {
             mBtSignalingObserver.sendWhenReady(messageItem);
         }
 
-        private void signalingCandidate(IceCandidate candidate) {
+        private synchronized void signalingCandidate(IceCandidate candidate) {
             List<IceCandidate> candidates = new ArrayList<>();
             candidates.add(candidate);
 
@@ -395,8 +402,13 @@ public class VoIPEngineService extends Service {
         }
 
 
-        private void addSignalingMsg(SignalingMessageItem signalingMsg) {
-            notifySignalingMsg(signalingMsg);
+        private void addSignalingMsg(final SignalingMessageItem signalingMsg) {
+            mLocalUiHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    notifySignalingMsg(signalingMsg);
+                }
+            });
         }
 
     }

@@ -186,7 +186,7 @@ public class RTCSession implements PeerConnection.Observer {
         });
     }
 
-    private void drainCandidates () {
+    private synchronized void drainCandidates () {
         Log.d(TAG, "drainCandidates!");
         mWorkingExecutor.execute(new Runnable() {
             @Override
