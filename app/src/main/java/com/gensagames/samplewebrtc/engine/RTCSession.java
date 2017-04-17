@@ -209,11 +209,11 @@ public class RTCSession implements PeerConnection.Observer {
                 try {
 
                     if (mDataChannel != null) {
-                        mDataChannel.dispose();
+                        mDataChannel.close();
                         mDataChannel = null;
                     }
                     if (mPeerConnection != null) {
-                        mPeerConnection.dispose();
+                        mPeerConnection.close();
                         mPeerConnection = null;
                     }
                 } catch (Exception ignored) {

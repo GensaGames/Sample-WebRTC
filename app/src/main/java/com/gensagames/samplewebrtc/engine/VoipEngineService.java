@@ -56,6 +56,7 @@ public class VoIPEngineService extends Service {
     private Handler mLocalUiHandler;
     private Map<Long, SessionInfoHolder> mSessionMap;
     private BTSignalingObserver mBtSignalingObserver;
+    private PeerConnectionFactory.Options mPeerOptions;
 
     @Override
     public void onCreate() {
@@ -64,9 +65,9 @@ public class VoIPEngineService extends Service {
         mSessionMap = new LinkedHashMap<>();
         mBtSignalingObserver = new BTSignalingObserver(getApplicationContext());
 
+        mPeerOptions = new PeerConnectionFactory.Options();
         RTCClient.getInstance().createPeerFactory(getApplicationContext(),
-                new PeerConnectionFactory.Options(), PeerConnectionParameters
-                        .getDefaultAudioOnly(), null);
+                mPeerOptions , PeerConnectionParameters.getDefaultAudioOnly(), null);
     }
 
     @Nullable
