@@ -137,12 +137,11 @@ public class CallListFragment extends Fragment implements SwipeRefreshLayout.OnR
     private void startSignalingCall (@NonNull BluetoothDeviceItem device) {
         Log.d(TAG, "startSignalingCall to Device!");
         mBluetoothMonitorController.cancelSearch();
-        Activity activityContext = getActivity();
-        Intent intent = new Intent(VoIPEngineService.ACTION_START_CALL, Uri.EMPTY,
-                activityContext, VoIPEngineService.class);
-        intent.putExtra(VoIPEngineService.EXTRA_CALL_SESSION,
-                new CallSessionItem(device.getDeviceName(), device.getDeviceAddress()));
-        activityContext.startService(intent);
+
+        MainSliderFragment fragment = (MainSliderFragment) this.getParentFragment();
+        if (fragment != null) {
+            fragment.notifyStartCall(device);
+        }
     }
 
     private AlertDialog getDialogForSignalingCall (String tittle, String msg,

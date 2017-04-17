@@ -50,6 +50,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
     private static final String FILE_AUDIO_DUMP = "audio.aecdump";
 
     private static RTCClient instance;
+    private EglBase mRootEglBase;
 
     private Executor mWorkingExecutor;
     private PeerConnectionFactory.Options mPeerFactoryOptions;
@@ -75,6 +76,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
 
     private RTCClient() {
         mWorkingExecutor = Executors.newSingleThreadScheduledExecutor();
+        mRootEglBase = EglBase.create();
     }
 
     public static RTCClient getInstance() {
@@ -90,6 +92,10 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
 
     public Executor getExecutor () {
         return mWorkingExecutor;
+    }
+
+    public EglBase getRootEglBase () {
+        return mRootEglBase;
     }
 
     public PeerConnectionParameters getPeerConnectionParameters () {
@@ -116,15 +122,14 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
 
 
     public void createPeerConnection (@NonNull final PeerCreationListener peerCreationListener,
-                                      @Nullable final EglBase.Context renderEGLContext,
                                       @Nullable final VideoCapturer videoCapturer,
                                       @Nullable final VideoRenderer.Callbacks videoCallbackLocal,
                                       @Nullable final List<VideoRenderer.Callbacks> videoCallbacksRemote) {
         mWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                createPeerConnectionInternal(peerCreationListener, renderEGLContext,
-                        videoCapturer, videoCallbackLocal, videoCallbacksRemote);
+                createPeerConnectionInternal(peerCreationListener, videoCapturer,
+                        videoCallbackLocal, videoCallbacksRemote);
             }
         });
     }
@@ -206,8 +211,8 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         createMediaConstraints();
         boolean isSuccessful = mPeerFactory != null;
         if (isSuccessful && mPeerConnectionParameters.tracing) {
-            Logging.enableTracing(NATIVE_TRACE_USE, EnumSet.of
-                    (Logging.TraceLevel.TRACE_DEFAULT));
+            Logging.enableTracing(NATIVE_TRACE_USE, EnumSet.
+                    of(Logging.TraceLevel.TRACE_DEFAULT));
             Logging.enableLogToDebugOutput(Logging.Severity.LS_INFO);
         }
 
@@ -260,7 +265,6 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
      * EglBase.Context renderEGLContext for PeerConnectionFactory
      */
     private void createPeerConnectionInternal(@NonNull PeerCreationListener peerCreationListener,
-                                              @Nullable EglBase.Context renderEGLContext,
                                       @Nullable VideoCapturer videoCapturer,
                                       @Nullable VideoRenderer.Callbacks videoCallbackLocal,
                                       @Nullable List<VideoRenderer.Callbacks> videoCallbacksRemote) {
@@ -272,8 +276,9 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         PeerConnection peerConnection;
         DataChannel dataChannel = null;
 
-        if (mPeerConnectionParameters.videoCallEnabled && renderEGLContext != null) {
-            mPeerFactory.setVideoHwAccelerationOptions(renderEGLContext, renderEGLContext);
+        if (mPeerConnectionParameters.videoCallEnabled && mRootEglBase != null) {
+            mPeerFactory.setVideoHwAccelerationOptions(mRootEglBase.getEglBaseContext(),
+                    mRootEglBase.getEglBaseContext());
         }
         PeerConnection.RTCConfiguration rtcConfig =
                 new PeerConnection.RTCConfiguration(mPeerConnectionParameters.iceServers);
@@ -344,10 +349,6 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
     private void createTracks(VideoCapturer videoCapturer,
                               VideoRenderer.Callbacks videoCallbackLocal) {
         if (mPeerConnectionParameters.videoCallEnabled) {
-            if (mVideoSource == null) {
-                mVideoSource = mPeerFactory.createVideoSource(videoCapturer);
-
-            }
             videoCapturer.startCapture(mPeerConnectionParameters.videoWidth,
                     mPeerConnectionParameters.videoHeight, mPeerConnectionParameters.videoFps);
 

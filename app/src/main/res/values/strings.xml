@@ -20,6 +20,7 @@
     <string name="state_outgoing_call">Calling…</string>
     <string name="state_incoming_call">Incoming call!</string>
     <string name="state_connected_call">Connected</string>
+    <string name="state_disconnected_call">Disconnected</string>
     <string name="state_idle">Waiting connection…</string>
 
 

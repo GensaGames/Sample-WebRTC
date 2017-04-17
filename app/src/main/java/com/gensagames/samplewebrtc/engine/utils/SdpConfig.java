@@ -16,6 +16,9 @@ import static com.gensagames.samplewebrtc.engine.parameters.Configs.*;
  * GensaGames
  */
 
+/**
+ * Helper class, taken from WebRTC Sample.
+ */
 @SuppressWarnings("WeakerAccess")
 public class SdpConfig {
 

@@ -82,15 +82,26 @@ public class PeerConnectionParameters {
         this.dataChannelParameters = dataChannelParameters;
     }
 
-    public static PeerConnectionParameters getDefaultAudioOnly () {
+    public static PeerConnectionParameters getDefaultAudio() {
+        return new PeerConnectionParameters(false, getIceServers(), false, true, Configs.HD_VIDEO_WIDTH,
+                Configs.HD_VIDEO_HEIGHT, Configs.DEFAULT_FPS, Configs.DEFAULT_VIDEO_BITRATE,
+                Configs.CODEC_DEFAULT, true, true, Configs.AUDIO_START_BITRATE, Configs.CODEC_DEFAULT,
+                false, false, false, false, false, false, false, null);
+    }
+
+    public static PeerConnectionParameters getDefaultVideo () {
+
+        return new PeerConnectionParameters(true, getIceServers(), false, true, Configs.HD_VIDEO_WIDTH,
+                Configs.HD_VIDEO_HEIGHT, Configs.DEFAULT_FPS, Configs.DEFAULT_VIDEO_BITRATE,
+                Configs.CODEC_DEFAULT, true, true, Configs.AUDIO_START_BITRATE, Configs.CODEC_DEFAULT,
+                false, false, false, false, false, false, false, null);
+    }
+
+    public static List<PeerConnection.IceServer> getIceServers () {
         List<PeerConnection.IceServer> iceServers = new ArrayList<>();
         iceServers.add(new PeerConnection.IceServer(Configs.GOOGLE_STUN_URI));
         iceServers.add(new PeerConnection.IceServer(Configs.GOOGLE_STUN_URI_1));
         iceServers.add(new PeerConnection.IceServer(Configs.SIPPHONE_STUN_URI));
-
-        return new PeerConnectionParameters(false, iceServers, false, true, Configs.HD_VIDEO_WIDTH,
-                Configs.HD_VIDEO_HEIGHT, Configs.DEFAULT_FPS, Configs.DEFAULT_VIDEO_BITRATE,
-                Configs.CODEC_DEFAULT, true, true, Configs.AUDIO_START_BITRATE, Configs.CODEC_DEFAULT,
-                false, false, false, false, false, false, false, null);
+        return iceServers;
     }
 }

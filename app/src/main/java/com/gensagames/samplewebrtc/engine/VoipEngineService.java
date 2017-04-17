@@ -11,9 +11,12 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.gensagames.samplewebrtc.engine.parameters.PeerConnectionParameters;
+import com.gensagames.samplewebrtc.engine.utils.ProxyRenderer;
+import com.gensagames.samplewebrtc.engine.utils.VideoCaptures;
 import com.gensagames.samplewebrtc.model.CallSessionItem;
 import com.gensagames.samplewebrtc.model.SignalingMessageItem;
 import com.gensagames.samplewebrtc.signaling.BTSignalingObserver;
+import com.gensagames.samplewebrtc.view.fragments.MainSliderFragment;
 
 import org.webrtc.IceCandidate;
 import org.webrtc.PeerConnectionFactory;
@@ -45,6 +48,8 @@ public class VoIPEngineService extends Service {
 
     public static final String EXTRA_SIGNAL_MSG = "extra.bt.msg";
     public static final String EXTRA_CALL_SESSION = "extra.call.session";
+    public static final String EXTRA_LOCAL_RENDERER = "extra.local.renderer";
+    public static final String EXTRA_REMOTE_RENDERER = "extra.remote.renderer";
 
     public static final String NOTIFY_INCOMING_CALL = "notify.incoming.call";
     public static final String NOTIFY_OUTGOING_CALL = "notify.outgoing.call";
@@ -67,7 +72,7 @@ public class VoIPEngineService extends Service {
 
         mPeerOptions = new PeerConnectionFactory.Options();
         RTCClient.getInstance().createPeerFactory(getApplicationContext(),
-                mPeerOptions , PeerConnectionParameters.getDefaultAudioOnly(), null);
+                mPeerOptions , PeerConnectionParameters.getDefaultAudio(), null);
     }
 
     @Nullable
@@ -86,11 +91,19 @@ public class VoIPEngineService extends Service {
         switch (action) {
             case ACTION_START_CALL:
                 startCall((CallSessionItem) intent
-                        .getSerializableExtra(EXTRA_CALL_SESSION));
+                                .getSerializableExtra(EXTRA_CALL_SESSION),
+                        (ProxyRenderer) intent
+                                .getSerializableExtra(EXTRA_LOCAL_RENDERER),
+                        (ProxyRenderer) intent
+                                .getSerializableExtra(EXTRA_REMOTE_RENDERER));
                 break;
             case ACTION_ANSWER_CALL:
                 answerIncomingCall((CallSessionItem) intent
-                        .getSerializableExtra(EXTRA_CALL_SESSION));
+                        .getSerializableExtra(EXTRA_CALL_SESSION),
+                        (ProxyRenderer) intent
+                                .getSerializableExtra(EXTRA_LOCAL_RENDERER),
+                        (ProxyRenderer) intent
+                                .getSerializableExtra(EXTRA_REMOTE_RENDERER));
                 break;
             case ACTION_OFFER_SDP:
                 incomingCall((SignalingMessageItem) intent
@@ -149,9 +162,9 @@ public class VoIPEngineService extends Service {
     }
 
     /**
-     * Just creation SessionInfoHolder and proceed with notificaion.
+     * Just creation SessionInfoHolder and proceed with notification.
      * Nothing interesting.
-     * @param signalingMsg
+     * @param signalingMsg - incoming msg
      */
     private synchronized void incomingCall(SignalingMessageItem signalingMsg) {
         final BluetoothDevice device = mBtSignalingObserver.getWorkingDevice();
@@ -181,7 +194,7 @@ public class VoIPEngineService extends Service {
     /**
      * Handle remote SDP Answer. (Our outgoing call was answered)
      * Need to save as Remote Description.
-     * @param item
+     * @param item -item to answer
      */
     private synchronized void answerOutgoingCall(SignalingMessageItem item) {
         SessionInfoHolder holder = mSessionMap.get(item.getPeerSessionId());
@@ -200,7 +213,9 @@ public class VoIPEngineService extends Service {
      * proceed with answering SDP. Here we should UPDATE SESSION ID.
      * @param item - item from signaling
      */
-    private synchronized void answerIncomingCall (final CallSessionItem item) {
+    private synchronized void answerIncomingCall (final CallSessionItem item,
+                                                  @Nullable ProxyRenderer localRenderer,
+                                                  @Nullable ProxyRenderer remoteRenderer) {
         RTCClient client = RTCClient.getInstance();
         client.createPeerConnection(new RTCClient.PeerCreationListener() {
             @Override
@@ -215,7 +230,7 @@ public class VoIPEngineService extends Service {
                 session.setRemoteDescription(holder.getRemoteSdp());
                 session.createAnswer();
             }
-        }, null, null, null, null);
+        }, VideoCaptures.createCorrectCapturer(getApplicationContext()), localRenderer, null);
     }
 
     /**
@@ -223,7 +238,9 @@ public class VoIPEngineService extends Service {
      * Started action for RTCClient to create PeerConnection.
      * @param item - device to connect signaling
      */
-    private synchronized void startCall (@NonNull final CallSessionItem item) {
+    private synchronized void startCall (@NonNull final CallSessionItem item,
+                                         @Nullable ProxyRenderer localRenderer,
+                                         @Nullable ProxyRenderer remoteRenderer) {
         mBtSignalingObserver.connectAddress(item.getBluetoothAddress());
         RTCClient.getInstance().createPeerConnection(new RTCClient.PeerCreationListener() {
             @Override
@@ -243,7 +260,7 @@ public class VoIPEngineService extends Service {
                 session.setPeerEventsListener(new PeerEventsHandler(sessionId));
                 session.createOffer();
             }
-        }, null, null, null, null);
+        }, VideoCaptures.createCorrectCapturer(getApplicationContext()), localRenderer, null);
     }
 
     /**
