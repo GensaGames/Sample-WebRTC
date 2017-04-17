@@ -49,13 +49,6 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
     private static final String FILE_TRACE_NAME = "app-webrtc.txt";
     private static final String FILE_AUDIO_DUMP = "audio.aecdump";
 
-    /*
-     * This might be optimized in generic way and conference supporting.
-     * But for sample we can leave it.
-     */
-    private static final String STREAM_UID = "App-Audio-Stream-1";
-    private static final String DATA_CHANNEL_UID = "App-Data-Channel";
-
     private static RTCClient instance;
 
     private Executor mWorkingExecutor;
@@ -223,6 +216,45 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         }
     }
 
+    private void createMediaConstraints() {
+        mPeerConstraints = new MediaConstraints();
+        mPeerConstraints.optional.add(new MediaConstraints.
+                KeyValuePair(DTLS_SRTP_KEY_AGREEMENT_CONSTRAINT, "true"));
+
+        /* Create Audio constraints Added for audio performance measurements.
+         * By default there are enabled!
+         */
+        mAudioConstraints = new MediaConstraints();
+        if (mPeerConnectionParameters.noAudioProcessing) {
+            Log.d(TAG, "Disabling audio processing");
+            mAudioConstraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair(AUDIO_ECHO_CANCELLATION_CONSTRAINT, "false"));
+            mAudioConstraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair(AUDIO_AUTO_GAIN_CONTROL_CONSTRAINT, "false"));
+            mAudioConstraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair(AUDIO_HIGH_PASS_FILTER_CONSTRAINT, "false"));
+            mAudioConstraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair(AUDIO_NOISE_SUPPRESSION_CONSTRAINT, "false"));
+        }
+        if (mPeerConnectionParameters.enableLevelControl) {
+            Log.d(TAG, "Enabling level control.");
+            mAudioConstraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair(AUDIO_LEVEL_CONTROL_CONSTRAINT, "true"));
+        }
+        /* Create SDP constraints.
+         */
+        mSdpMediaConstraints = new MediaConstraints();
+        mSdpMediaConstraints.mandatory.add(
+                new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
+        if (mPeerConnectionParameters.videoCallEnabled) {
+            mSdpMediaConstraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
+        } else {
+            mSdpMediaConstraints.mandatory.add(
+                    new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"));
+        }
+    }
+
     /**
      * For creation PeerConnection with Video enable, we should also use
      * EglBase.Context renderEGLContext for PeerConnectionFactory
@@ -269,8 +301,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
             init.maxRetransmitTimeMs = mPeerConnectionParameters.dataChannelParameters.maxRetransmitTimeMs;
             init.id = mPeerConnectionParameters.dataChannelParameters.id;
             init.protocol = mPeerConnectionParameters.dataChannelParameters.protocol;
-            dataChannel = peerConnection.createDataChannel(String.valueOf(UUID.randomUUID()
-                    .getMostSignificantBits()), init);
+            dataChannel = peerConnection.createDataChannel(getRandomLongUuid(), init);
             Log.d(TAG, "Created PeerConnection - DataChannel!");
         }
         /*
@@ -300,8 +331,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
 
     private void createMediaStream(VideoCapturer videoCapturer) {
         if (mMediaStream == null) {
-            mMediaStream = mPeerFactory.createLocalMediaStream(String
-                    .valueOf(UUID.randomUUID().getMostSignificantBits()));
+            mMediaStream = mPeerFactory.createLocalMediaStream(getRandomLongUuid());
         }
         if (mAudioSource == null) {
             mAudioSource = mPeerFactory.createAudioSource(mAudioConstraints);
@@ -321,15 +351,15 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
             videoCapturer.startCapture(mPeerConnectionParameters.videoWidth,
                     mPeerConnectionParameters.videoHeight, mPeerConnectionParameters.videoFps);
 
-            VideoTrack videoTrack = mPeerFactory.createVideoTrack(String.valueOf
-                    (UUID.randomUUID().getMostSignificantBits()), mVideoSource);
+            VideoTrack videoTrack = mPeerFactory.createVideoTrack
+                    (getRandomLongUuid(), mVideoSource);
             videoTrack.addRenderer(new VideoRenderer(videoCallbackLocal));
             videoTrack.setEnabled(true);
             mMediaStream.addTrack(videoTrack);
         }
 
-        AudioTrack audioTrack = mPeerFactory.createAudioTrack(String.valueOf
-                (UUID.randomUUID().getMostSignificantBits()), mAudioSource);
+        AudioTrack audioTrack = mPeerFactory.createAudioTrack
+                (getRandomLongUuid(), mAudioSource);
         audioTrack.setEnabled(true);
         mMediaStream.addTrack(audioTrack);
     }
@@ -339,7 +369,6 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
      * TODO(Video) Use this method (Based on Chromium sample)
      */
     @Nullable
-    @SuppressWarnings("unused")
     private RtpSender findVideoSender(@NonNull PeerConnection peerConnection) {
         for (RtpSender sender : peerConnection.getSenders()) {
             if (sender.track() != null) {
@@ -353,46 +382,11 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         return null;
     }
 
-
-
-    private void createMediaConstraints() {
-        mPeerConstraints = new MediaConstraints();
-        mPeerConstraints.optional.add(new MediaConstraints.
-                KeyValuePair(DTLS_SRTP_KEY_AGREEMENT_CONSTRAINT, "true"));
-
-        /* Create Audio constraints Added for audio performance measurements.
-         * By default there are enabled!
-         */
-        mAudioConstraints = new MediaConstraints();
-        if (mPeerConnectionParameters.noAudioProcessing) {
-            Log.d(TAG, "Disabling audio processing");
-            mAudioConstraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair(AUDIO_ECHO_CANCELLATION_CONSTRAINT, "false"));
-            mAudioConstraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair(AUDIO_AUTO_GAIN_CONTROL_CONSTRAINT, "false"));
-            mAudioConstraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair(AUDIO_HIGH_PASS_FILTER_CONSTRAINT, "false"));
-            mAudioConstraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair(AUDIO_NOISE_SUPPRESSION_CONSTRAINT, "false"));
-        }
-        if (mPeerConnectionParameters.enableLevelControl) {
-            Log.d(TAG, "Enabling level control.");
-            mAudioConstraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair(AUDIO_LEVEL_CONTROL_CONSTRAINT, "true"));
-        }
-        /* Create SDP constraints.
-         */
-        mSdpMediaConstraints = new MediaConstraints();
-        mSdpMediaConstraints.mandatory.add(
-                new MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"));
-        if (mPeerConnectionParameters.videoCallEnabled) {
-            mSdpMediaConstraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"));
-        } else {
-            mSdpMediaConstraints.mandatory.add(
-                    new MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"));
-        }
+    private String getRandomLongUuid () {
+        return String.valueOf(UUID.randomUUID().getMostSignificantBits()
+                & Long.MAX_VALUE);
     }
+
 
 
     /**
