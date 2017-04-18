@@ -72,7 +72,7 @@ public class VoIPEngineService extends Service {
 
         mPeerOptions = new PeerConnectionFactory.Options();
         RTCClient.getInstance().createPeerFactory(getApplicationContext(),
-                mPeerOptions , PeerConnectionParameters.getDefaultAudio(), null);
+                mPeerOptions , PeerConnectionParameters.getDefaultVideo(), null);
     }
 
     @Nullable
