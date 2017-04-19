@@ -124,7 +124,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
     public void createPeerConnection (@NonNull final PeerCreationListener peerCreationListener,
                                       @Nullable final VideoCapturer videoCapturer,
                                       @Nullable final VideoRenderer.Callbacks videoCallbackLocal,
-                                      @Nullable final List<VideoRenderer.Callbacks> videoCallbacksRemote) {
+                                      @Nullable final VideoRenderer.Callbacks videoCallbacksRemote) {
         mWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
@@ -266,8 +266,8 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
      */
     private void createPeerConnectionInternal(@NonNull PeerCreationListener peerCreationListener,
                                       @Nullable VideoCapturer videoCapturer,
-                                      @Nullable VideoRenderer.Callbacks videoCallbackLocal,
-                                      @Nullable List<VideoRenderer.Callbacks> videoCallbacksRemote) {
+                                      @Nullable VideoRenderer.Callbacks videoLocalRenderer,
+                                      @Nullable VideoRenderer.Callbacks videoRemoteRenderer) {
         if (mPeerFactory == null) {
             Log.e(TAG, "PeerConnection factory is not created");
             return;
@@ -315,7 +315,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
          */
         Log.d(TAG, "Check and create Media...");
         createMediaStream(videoCapturer);
-        createTracks(videoCapturer, videoCallbackLocal);
+        createTracks(videoCapturer, videoLocalRenderer);
         peerConnection.addStream(mMediaStream);
 
         if (mPeerConnectionParameters.aecDump) {
@@ -329,8 +329,8 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
                 Log.e(TAG, "Can not open aecdump file!", e);
             }
         }
-        peerCreationListener.onPeerCreated(rtcSession.configure
-                (peerConnection, dataChannel, videoCapturer, videoCallbackLocal));
+        peerCreationListener.onPeerCreated(rtcSession.configure(peerConnection, dataChannel,
+                videoCapturer, videoLocalRenderer, videoRemoteRenderer));
     }
 
 

@@ -17,6 +17,7 @@ import org.webrtc.SessionDescription;
 import org.webrtc.StatsReport;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoRenderer;
+import org.webrtc.VideoTrack;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,13 +43,16 @@ public class RTCSession implements PeerConnection.Observer {
     private PeerConnection.IceConnectionState mIceConnectionState;
     private PeerEventsListener mPeerEventsListener;
     private SessionDescription mWorkingSdp;
+
     /**
-     * For Video Support only
+     *  For Video Support only
      */
     @Nullable
     private VideoCapturer mVideoCapturer;
     @Nullable
-    private VideoRenderer.Callbacks mVideoCallbackLocal;
+    private VideoRenderer.Callbacks mVideoLocalRenderer;
+    @Nullable
+    private VideoRenderer.Callbacks mVideoRemoteRenderer;
 
     private long mSessionId;
     private boolean isInitiator;
@@ -103,11 +107,13 @@ public class RTCSession implements PeerConnection.Observer {
 
     protected RTCSession configure(PeerConnection peerConnection, @Nullable DataChannel dataChannel,
                                    @Nullable VideoCapturer capturer,
-                                   @Nullable VideoRenderer.Callbacks callbacks) {
+                                   @Nullable VideoRenderer.Callbacks local,
+                                   @Nullable VideoRenderer.Callbacks remote) {
         mPeerConnection = peerConnection;
         mDataChannel = dataChannel;
         mVideoCapturer = capturer;
-        mVideoCallbackLocal = callbacks;
+        mVideoLocalRenderer = local;
+        mVideoRemoteRenderer = remote;
         return this;
     }
 
@@ -206,17 +212,13 @@ public class RTCSession implements PeerConnection.Observer {
         mWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                try {
-
-                    if (mDataChannel != null) {
-                        mDataChannel.close();
-                        mDataChannel = null;
-                    }
-                    if (mPeerConnection != null) {
-                        mPeerConnection.close();
-                        mPeerConnection = null;
-                    }
-                } catch (Exception ignored) {
+                if (mDataChannel != null) {
+                    mDataChannel.close();
+                    mDataChannel = null;
+                }
+                if (mPeerConnection != null) {
+                    mPeerConnection.close();
+                    mPeerConnection = null;
                 }
             }
         });
@@ -287,6 +289,16 @@ public class RTCSession implements PeerConnection.Observer {
     @Override
     public void onAddStream(MediaStream mediaStream) {
         Log.d(TAG, "onAddStream");
+
+        /**
+         * Only for Video! Catching remote
+         * Video tracks to add Renderer!
+         */
+        if (mediaStream.videoTracks.size() > 0) {
+            VideoTrack remoteVideoTrack = mediaStream.videoTracks.get(0);
+            remoteVideoTrack.addRenderer(new VideoRenderer(mVideoRemoteRenderer));
+            remoteVideoTrack.setEnabled(true);
+        }
     }
 
     @Override

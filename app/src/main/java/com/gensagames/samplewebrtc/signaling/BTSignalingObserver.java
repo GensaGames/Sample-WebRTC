@@ -127,28 +127,11 @@ public class BTSignalingObserver implements MessageObservable, ConnectivityChang
         try {
             SignalingMessageItem btMsg = new Gson()
                     .fromJson(msg, SignalingMessageItem.class);
-
             SignalingMessageItem.MessageType btMsgType = btMsg.getMessageType();
-            Intent intent = null;
-            if (btMsgType == SignalingMessageItem.MessageType.SDP_EXCHANGE) {
-                if (btMsg.getWorkingSdp().type == SessionDescription.Type.OFFER) {
-                    intent = new Intent(VoIPEngineService.ACTION_OFFER_SDP, Uri.EMPTY,
-                            mLocalContext, VoIPEngineService.class);
-                }
-                if (btMsg.getWorkingSdp().type == SessionDescription.Type.ANSWER) {
-                    intent = new Intent(VoIPEngineService.ACTION_ANSWER_SDP, Uri.EMPTY,
-                            mLocalContext, VoIPEngineService.class);
-                }
-            }
-            if (btMsgType == SignalingMessageItem.MessageType.CANDIDATES) {
-                intent = new Intent(VoIPEngineService.ACTION_INCOMING_CANDIDATES, Uri.EMPTY,
-                        mLocalContext, VoIPEngineService.class);
-            }
 
-
-            if (intent != null) {
-                intent.putExtra(VoIPEngineService.EXTRA_SIGNAL_MSG, btMsg);
-                mLocalContext.startService(intent);
+            if (btMsgType == SignalingMessageItem.MessageType.CANDIDATES
+                    || btMsgType == SignalingMessageItem.MessageType.SDP_EXCHANGE) {
+                VoIPEngineService.getInstance().onStartSignaling(btMsg);
             }
         }
         catch (JsonSyntaxException ex) {

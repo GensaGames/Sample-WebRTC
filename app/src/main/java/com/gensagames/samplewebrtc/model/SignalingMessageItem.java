@@ -3,6 +3,8 @@ package com.gensagames.samplewebrtc.model;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
+import com.gensagames.samplewebrtc.engine.VoIPEngineService;
+
 import org.webrtc.IceCandidate;
 import org.webrtc.SessionDescription;
 
@@ -16,9 +18,11 @@ import java.util.List;
  */
 
 public class SignalingMessageItem implements Serializable {
+
+    private String action = VoIPEngineService.ACTION_IDLE;
     private String userName;
-    private MessageType msgType;
     private String additionalContent;
+    private MessageType msgType;
 
     /**
      * Specific only for WebRTC usage
@@ -93,9 +97,14 @@ public class SignalingMessageItem implements Serializable {
         return additionalContent;
     }
 
+    @NonNull
+    public String getAction() {
+        return action;
+    }
 
-
-
+    public void setAction(@NonNull String action) {
+        this.action = action;
+    }
 
     /**
      * Helper class, to work with SDP, as

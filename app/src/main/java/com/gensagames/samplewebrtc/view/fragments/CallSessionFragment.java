@@ -30,7 +30,6 @@ public class CallSessionFragment extends Fragment {
     private View mTextRefresh;
     private RecyclerView mRecyclerView;
     private SignalingMsgAdapter mSignalingMsgAdapter;
-    private SignalingMsgReceiver mSignalingMsgReceiver;
 
     @Nullable
     @Override
@@ -41,21 +40,9 @@ public class CallSessionFragment extends Fragment {
         mTextRefresh = view.findViewById(R.id.fragmentTextRefresh);
 
         setupAdapter();
-        registerReceiver();
         return view;
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        getActivity().unregisterReceiver(mSignalingMsgReceiver);
-    }
-
-    private void registerReceiver () {
-        mSignalingMsgReceiver = new CallSessionFragment.SignalingMsgReceiver();
-        IntentFilter intentFilter = new IntentFilter(VoIPEngineService.NOTIFY_SIGNAL_MSG);
-        getActivity().registerReceiver(mSignalingMsgReceiver, intentFilter);
-    }
 
     private void setupAdapter() {
         RecyclerView.LayoutManager mLayoutManager = new LinearLayoutManager(getContext());
@@ -66,7 +53,7 @@ public class CallSessionFragment extends Fragment {
         mRecyclerView.setAdapter(mSignalingMsgAdapter);
     }
 
-    private void handleSignalingMsg (SignalingMessageItem item) {
+    public void handleSignalingMsg (SignalingMessageItem item) {
         if (mTextRefresh.getVisibility() == View.VISIBLE) {
             mTextRefresh.setVisibility(View.GONE);
         }
@@ -74,14 +61,4 @@ public class CallSessionFragment extends Fragment {
         mSignalingMsgAdapter.notifyDataSetChanged();
     }
 
-    private class SignalingMsgReceiver extends BroadcastReceiver {
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(VoIPEngineService.NOTIFY_SIGNAL_MSG)) {
-                handleSignalingMsg((SignalingMessageItem) intent
-                        .getSerializableExtra(VoIPEngineService.EXTRA_SIGNAL_MSG));
-            }
-        }
-    }
 }

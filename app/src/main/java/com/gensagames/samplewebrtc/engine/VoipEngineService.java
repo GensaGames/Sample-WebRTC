@@ -1,5 +1,6 @@
 package com.gensagames.samplewebrtc.engine;
 
+import android.app.Application;
 import android.app.Service;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
@@ -16,7 +17,7 @@ import com.gensagames.samplewebrtc.engine.utils.VideoCaptures;
 import com.gensagames.samplewebrtc.model.CallSessionItem;
 import com.gensagames.samplewebrtc.model.SignalingMessageItem;
 import com.gensagames.samplewebrtc.signaling.BTSignalingObserver;
-import com.gensagames.samplewebrtc.view.fragments.MainSliderFragment;
+import com.gensagames.samplewebrtc.view.MainActivity;
 
 import org.webrtc.IceCandidate;
 import org.webrtc.PeerConnectionFactory;
@@ -34,112 +35,115 @@ import java.util.Map;
  * GensaGames
  */
 
-public class VoIPEngineService extends Service {
+public class VoIPEngineService {
 
     private static final String TAG = VoIPEngineService.class.getSimpleName();
 
     public static final String ACTION_IDLE = "action.idle";
     public static final String ACTION_START_CALL = "action.start.call";
     public static final String ACTION_ANSWER_CALL = "action.receive.call";
-    public static final String ACTION_OFFER_SDP = "action.offer.sdp";
-    public static final String ACTION_ANSWER_SDP = "action.answer.sdp";
-    public static final String ACTION_INCOMING_CANDIDATES = "action.incoming.candidates";
     public static final String ACTION_HANGUP_CALL = "action.hangup.call";
 
-    public static final String EXTRA_SIGNAL_MSG = "extra.bt.msg";
-    public static final String EXTRA_CALL_SESSION = "extra.call.session";
-    public static final String EXTRA_LOCAL_RENDERER = "extra.local.renderer";
-    public static final String EXTRA_REMOTE_RENDERER = "extra.remote.renderer";
+    private static final String ACTION_OFFER_SDP = "action.offer.sdp";
+    private static final String ACTION_ANSWER_SDP = "action.answer.sdp";
+    private static final String ACTION_INCOMING_CANDIDATES = "action.incoming.candidates";
 
-    public static final String NOTIFY_INCOMING_CALL = "notify.incoming.call";
-    public static final String NOTIFY_OUTGOING_CALL = "notify.outgoing.call";
-    public static final String NOTIFY_CALL_CONNECTED = "notify.call.connected";
-    public static final String NOTIFY_CALL_DISCONNECTED = "notify.call.disconnected";
-    public static final String NOTIFY_SIGNAL_MSG = "notify.signaling.msg";
+    public interface VoIPEngineEvents {
+        void onOutgoingCall (CallSessionItem item);
+        void onIncomingCall (CallSessionItem item);
+        void onSignalingMsg (SignalingMessageItem item);
+        void onConnected (CallSessionItem item);
+        void onDisconnected (CallSessionItem item);
+    }
 
+    private static VoIPEngineService instance;
 
     private Handler mLocalUiHandler;
     private Map<Long, SessionInfoHolder> mSessionMap;
+    private List <VoIPEngineEvents> mEngineEventsList;
     private BTSignalingObserver mBtSignalingObserver;
-    private PeerConnectionFactory.Options mPeerOptions;
 
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        mLocalUiHandler = new Handler(Looper.getMainLooper());
-        mSessionMap = new LinkedHashMap<>();
-        mBtSignalingObserver = new BTSignalingObserver(getApplicationContext());
-
-        mPeerOptions = new PeerConnectionFactory.Options();
-        RTCClient.getInstance().createPeerFactory(getApplicationContext(),
-                mPeerOptions , PeerConnectionParameters.getDefaultVideo(), null);
+    private VoIPEngineService() {
+        onCreate();
     }
 
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) {
-            return START_NOT_STICKY ;
+    public static VoIPEngineService getInstance() {
+        if (instance == null) {
+            synchronized (RTCClient.class) {
+                if (instance == null) {
+                    instance = new VoIPEngineService();
+                }
+            }
         }
-        String action = intent.getAction();
-        Log.i(TAG, "Proceed with action: " + action);
-        switch (action) {
+        return instance;
+    }
+
+    public boolean removeEngineEventListener(VoIPEngineEvents events) {
+        return mEngineEventsList.remove(events);
+    }
+
+    public boolean addEngineEventListener(VoIPEngineEvents events) {
+        return !mEngineEventsList.contains(events)
+                && mEngineEventsList.add(events);
+    }
+
+    public void onCreate() {
+        mSessionMap = new LinkedHashMap<>();
+        mEngineEventsList = new ArrayList<>();
+        mLocalUiHandler = new Handler(Looper.getMainLooper());
+        mBtSignalingObserver = new BTSignalingObserver(MainActivity.getContextInstance());
+
+        PeerConnectionFactory.Options mPeerOptions = new PeerConnectionFactory.Options();
+        RTCClient.getInstance().createPeerFactory(MainActivity.getContextInstance(),
+                mPeerOptions, PeerConnectionParameters.getDefaultVideo(), null);
+    }
+
+    public void onStartCommand(CallSessionItem item) {
+        switch (item.getAction()) {
             case ACTION_START_CALL:
-                startCall((CallSessionItem) intent
-                                .getSerializableExtra(EXTRA_CALL_SESSION),
-                        (ProxyRenderer) intent
-                                .getSerializableExtra(EXTRA_LOCAL_RENDERER),
-                        (ProxyRenderer) intent
-                                .getSerializableExtra(EXTRA_REMOTE_RENDERER));
+                startCall(item);
                 break;
             case ACTION_ANSWER_CALL:
-                answerIncomingCall((CallSessionItem) intent
-                        .getSerializableExtra(EXTRA_CALL_SESSION),
-                        (ProxyRenderer) intent
-                                .getSerializableExtra(EXTRA_LOCAL_RENDERER),
-                        (ProxyRenderer) intent
-                                .getSerializableExtra(EXTRA_REMOTE_RENDERER));
-                break;
-            case ACTION_OFFER_SDP:
-                incomingCall((SignalingMessageItem) intent
-                        .getSerializableExtra(EXTRA_SIGNAL_MSG));
-                break;
-            case ACTION_ANSWER_SDP:
-                answerOutgoingCall((SignalingMessageItem) intent
-                        .getSerializableExtra(EXTRA_SIGNAL_MSG));
-            case ACTION_INCOMING_CANDIDATES:
-                handleIncomingCandidates((SignalingMessageItem) intent
-                        .getSerializableExtra(EXTRA_SIGNAL_MSG));
+                answerIncomingCall(item);
                 break;
             case ACTION_HANGUP_CALL:
-                hangupCall(intent.getSerializableExtra(EXTRA_SIGNAL_MSG));
+                hangupCall(item);
                 break;
         }
-        return START_STICKY ;
+    }
+
+    public void onStartSignaling (SignalingMessageItem item) {
+        switch (item.getAction()) {
+            case ACTION_OFFER_SDP:
+                incomingCall(item);
+                break;
+            case ACTION_ANSWER_SDP:
+                answerOutgoingCall(item);
+                break;
+            case ACTION_INCOMING_CANDIDATES:
+                handleIncomingCandidates(item);
+                break;
+        }
     }
 
 
     /**
      * Closing session including, which is not created yet
-     * TODO(Conference) Optimize this for Conference!
      */
-    private synchronized void hangupCall (Object item) {
-        if (mSessionMap.isEmpty()) {
-            return;
-        }
-        Long sessionId = mSessionMap.keySet().iterator().next();
+    private synchronized void hangupCall (@NonNull CallSessionItem item) {
+        long sessionId = item.getSessionId();
         SessionInfoHolder holder = mSessionMap.get(sessionId);
+
         if (holder == null || holder.getSession() == null) {
+            Log.e(TAG, "Current Session empty!");
             return;
         }
         holder.getSession().closeSession();
         mSessionMap.remove(sessionId);
-        notifyCallDisconnected(null);
+
+        for (VoIPEngineEvents events : mEngineEventsList) {
+            events.onDisconnected(item);
+        }
     }
 
     private synchronized void handleIncomingCandidates (SignalingMessageItem item) {
@@ -158,7 +162,7 @@ public class VoIPEngineService extends Service {
             session.setRemoteCandidates(item.getCandidates());
         }
 
-        holder.addSignalingMsg(item);
+        notifySignalingMsg(item);
     }
 
     /**
@@ -182,12 +186,13 @@ public class VoIPEngineService extends Service {
         CallSessionItem item = new CallSessionItem(signalingMsg.getUserName(), sessionId,
                 CallSessionItem.CallState.INCOMING);
         item.setBluetoothAddress(device.getAddress());
-
         holder.setRemoteSdp(signalingMsg.getWorkingSdp());
         holder.setCallSession(item);
 
-        notifyIncomingCall(item);
-        holder.addSignalingMsg(signalingMsg);
+        for (VoIPEngineEvents events : mEngineEventsList) {
+            events.onIncomingCall(item);
+        }
+        notifySignalingMsg(signalingMsg);
     }
 
 
@@ -205,7 +210,7 @@ public class VoIPEngineService extends Service {
             return;
         }
         session.setRemoteDescription(item.getWorkingSdp());
-        holder.addSignalingMsg(item);
+        notifySignalingMsg(item);
     }
 
     /**
@@ -213,9 +218,7 @@ public class VoIPEngineService extends Service {
      * proceed with answering SDP. Here we should UPDATE SESSION ID.
      * @param item - item from signaling
      */
-    private synchronized void answerIncomingCall (final CallSessionItem item,
-                                                  @Nullable ProxyRenderer localRenderer,
-                                                  @Nullable ProxyRenderer remoteRenderer) {
+    private synchronized void answerIncomingCall (final CallSessionItem item) {
         RTCClient client = RTCClient.getInstance();
         client.createPeerConnection(new RTCClient.PeerCreationListener() {
             @Override
@@ -230,7 +233,8 @@ public class VoIPEngineService extends Service {
                 session.setRemoteDescription(holder.getRemoteSdp());
                 session.createAnswer();
             }
-        }, VideoCaptures.createCorrectCapturer(getApplicationContext()), localRenderer, null);
+        }, VideoCaptures.createCorrectCapturer(MainActivity.getContextInstance()),
+                item.getLocalProxyRenderer(), item.getRemoteProxyRenderer());
     }
 
     /**
@@ -238,9 +242,7 @@ public class VoIPEngineService extends Service {
      * Started action for RTCClient to create PeerConnection.
      * @param item - device to connect signaling
      */
-    private synchronized void startCall (@NonNull final CallSessionItem item,
-                                         @Nullable ProxyRenderer localRenderer,
-                                         @Nullable ProxyRenderer remoteRenderer) {
+    private synchronized void startCall (@NonNull final CallSessionItem item) {
         mBtSignalingObserver.connectAddress(item.getBluetoothAddress());
         RTCClient.getInstance().createPeerConnection(new RTCClient.PeerCreationListener() {
             @Override
@@ -249,10 +251,12 @@ public class VoIPEngineService extends Service {
                 SessionInfoHolder holder = new SessionInfoHolder();
                 long sessionId = session.getSessionId();
                 mSessionMap.put(sessionId, holder);
-
                 item.setSessionId(sessionId);
                 item.setConnectionState(CallSessionItem.CallState.CALLING);
-                notifyOutgoingCall(item);
+
+                for (VoIPEngineEvents events : mEngineEventsList) {
+                    events.onOutgoingCall(item);
+                }
 
                 holder.setCallSession(item);
                 holder.setRTCSession(session);
@@ -260,51 +264,18 @@ public class VoIPEngineService extends Service {
                 session.setPeerEventsListener(new PeerEventsHandler(sessionId));
                 session.createOffer();
             }
-        }, VideoCaptures.createCorrectCapturer(getApplicationContext()), localRenderer, null);
+        }, VideoCaptures.createCorrectCapturer(MainActivity.getContextInstance()),
+                item.getLocalProxyRenderer(), item.getRemoteProxyRenderer());
     }
 
     /**
-     * ************************************************************
-     * Send notify action to Subscribers of this Service!
+     * This notify, just to show Signaling messages.
+     * @param signalingMsg - Send events with current msg
      */
-
-    private void notifyIncomingCall (CallSessionItem item) {
-        Log.d(TAG, "notifyIncomingCall... ");
-        Intent intent = new Intent(NOTIFY_INCOMING_CALL);
-        intent.putExtra(EXTRA_CALL_SESSION, item);
-        getApplicationContext().sendBroadcast(intent);
-    }
-
-    private void notifyCallConnected (CallSessionItem item) {
-        Log.d(TAG, "notifyCallConnected... ");
-        Intent intent = new Intent(NOTIFY_CALL_CONNECTED);
-        intent.putExtra(EXTRA_CALL_SESSION, item);
-        getApplicationContext().sendBroadcast(intent);
-    }
-
-    private void notifyOutgoingCall (CallSessionItem item) {
-        Log.d(TAG, "notifyOutgoingCall... ");
-        Intent intent = new Intent(NOTIFY_OUTGOING_CALL);
-        intent.putExtra(EXTRA_CALL_SESSION, item);
-        getApplicationContext().sendBroadcast(intent);
-    }
-
-    private void notifyCallDisconnected (CallSessionItem item) {
-        Log.d(TAG, "notifyCallDisconnected... ");
-        Intent intent = new Intent(NOTIFY_CALL_DISCONNECTED);
-        intent.putExtra(EXTRA_CALL_SESSION, item);
-        getApplicationContext().sendBroadcast(intent);
-    }
-
-    /**
-     * Some changes for sending Signaling message, with RTC Events.
-     * USED JUST FOR SAMPLE, TO SHOW RENEGOTIATION
-     */
-    private void notifySignalingMsg (SignalingMessageItem item) {
-        Log.d(TAG, "notifySignalingMsg... ");
-        Intent intent = new Intent(NOTIFY_SIGNAL_MSG);
-        intent.putExtra(EXTRA_SIGNAL_MSG, item);
-        getApplicationContext().sendBroadcast(intent);
+    private void notifySignalingMsg(final SignalingMessageItem signalingMsg) {
+        for (VoIPEngineEvents events : mEngineEventsList) {
+            events.onSignalingMsg(signalingMsg);
+        }
     }
 
     /**
@@ -348,8 +319,10 @@ public class VoIPEngineService extends Service {
             Log.d(TAG, "onIceConnected");
             CallSessionItem item  = mSessionMap.get(mSessionId).getCallSessionItem();
             item.setConnectionState(CallSessionItem.CallState.CONNECTED);
-            notifyCallConnected(item);
 
+            for (VoIPEngineEvents events : mEngineEventsList) {
+                events.onConnected(item);
+            }
         }
 
         @Override
@@ -357,7 +330,10 @@ public class VoIPEngineService extends Service {
             Log.d(TAG, "onIceDisconnected");
             CallSessionItem item  = mSessionMap.get(mSessionId).getCallSessionItem();
             item.setConnectionState(CallSessionItem.CallState.DISCONNECTED);
-            notifyCallDisconnected(item);
+
+            for (VoIPEngineEvents events : mEngineEventsList) {
+                events.onDisconnected(item);
+            }
         }
 
         @Override
@@ -369,6 +345,8 @@ public class VoIPEngineService extends Service {
             SignalingMessageItem messageItem = new SignalingMessageItem(mSessionMap.get(mSessionId)
                     .getCallSessionItem().getRemoteName(), mSessionId, SignalingMessageItem
                     .MessageType.SDP_EXCHANGE, sdp, null);
+            messageItem.setAction(sdp.type.equals(SessionDescription.Type.OFFER)
+                    ? ACTION_OFFER_SDP : ACTION_ANSWER_SDP);
             mBtSignalingObserver.sendWhenReady(messageItem);
         }
 
@@ -379,10 +357,15 @@ public class VoIPEngineService extends Service {
             SignalingMessageItem messageItem = new SignalingMessageItem(mSessionMap.get(mSessionId)
                     .getCallSessionItem().getRemoteName(), mSessionId, SignalingMessageItem
                     .MessageType.CANDIDATES, candidates, null, null);
+            messageItem.setAction(ACTION_INCOMING_CANDIDATES);
             mBtSignalingObserver.sendWhenReady(messageItem);
         }
     }
 
+    /**
+     * **********************************************************
+     * Main Holder, for gathering all RTC items, and Event handlers
+     */
 
     private class SessionInfoHolder {
 
@@ -417,16 +400,6 @@ public class VoIPEngineService extends Service {
 
         private CallSessionItem getCallSessionItem() {
             return callSessionItem;
-        }
-
-
-        private void addSignalingMsg(final SignalingMessageItem signalingMsg) {
-            mLocalUiHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    notifySignalingMsg(signalingMsg);
-                }
-            });
         }
 
     }

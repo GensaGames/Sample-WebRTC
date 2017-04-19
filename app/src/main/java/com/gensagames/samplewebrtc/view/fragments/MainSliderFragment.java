@@ -6,12 +6,11 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.Nullable;
-import android.support.annotation.RequiresApi;
 import android.support.design.widget.AppBarLayout;
 import android.support.design.widget.CollapsingToolbarLayout;
 import android.support.design.widget.CoordinatorLayout;
@@ -20,7 +19,6 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -32,16 +30,15 @@ import com.gensagames.samplewebrtc.engine.VoIPEngineService;
 import com.gensagames.samplewebrtc.engine.utils.ProxyRenderer;
 import com.gensagames.samplewebrtc.model.BluetoothDeviceItem;
 import com.gensagames.samplewebrtc.model.CallSessionItem;
+import com.gensagames.samplewebrtc.model.SignalingMessageItem;
 import com.gensagames.samplewebrtc.view.helper.CollapseAppBarLayoutBehavior;
 import com.gensagames.samplewebrtc.view.helper.FragmentHeaderTransaction;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
 
-import org.webrtc.EglBase;
 import org.webrtc.RendererCommon;
 import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.VideoRenderer;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,7 +56,7 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
     private AppBarLayout mAppBarLayout;
     private CollapsingToolbarLayout mCollapsingLayout;
     private LocalFragmentAdapter mLocalFragmentAdapter;
-    private IncomingCallReceiver mIncomingCallReceiver;
+    private VoIPEngineListener mVoIPEngineListener;
 
     private View mCollapsingParent;
     private TextView mCollapsingText1;
@@ -68,8 +65,6 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
     private View mVideoPanel;
     private SurfaceViewRenderer pipRenderer;
     private SurfaceViewRenderer fullscreenRenderer;
-    private final List<VideoRenderer.Callbacks> remoteRenderers =
-            new ArrayList<VideoRenderer.Callbacks>();
     private final ProxyRenderer remoteProxyRenderer = new ProxyRenderer();
     private final ProxyRenderer localProxyRenderer = new ProxyRenderer();
 
@@ -105,16 +100,12 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        getActivity().unregisterReceiver(mIncomingCallReceiver);
+        VoIPEngineService.getInstance()
+                .removeEngineEventListener(mVoIPEngineListener);
     }
 
 
-
-
-
-
     private void setupVideoRenderer () {
-
         pipRenderer.init(RTCClient.getInstance().getRootEglBase().getEglBaseContext(), null);
         pipRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
 
@@ -125,17 +116,11 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         pipRenderer.setEnableHardwareScaler(true);
         fullscreenRenderer.setEnableHardwareScaler(true);
 
-
         localProxyRenderer.setTarget(fullscreenRenderer);
         remoteProxyRenderer.setTarget(pipRenderer);
         fullscreenRenderer.setMirror(true);
         pipRenderer.setMirror(false);
     }
-
-
-
-
-
 
 
     private void handleCallDisconnected (CallSessionItem item) {
@@ -147,6 +132,7 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
 
         mBtnAnswerView.setVisibility(View.GONE);
         mBtnHangupView.setVisibility(View.GONE);
+        mVideoPanel.setVisibility(View.GONE);
 
         mLastSessionItem = item;
         notifyService(VoIPEngineService.ACTION_HANGUP_CALL);
@@ -158,8 +144,10 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         mBtnAnswerView.setEnabled(false);
         mCollapsingText1.setText(item.getRemoteName());
         mCollapsingText2.setText(getString(R.string.state_outgoing_call));
+
         mBtnHangupView.setVisibility(View.VISIBLE);
         mBtnAnswerView.setVisibility(View.GONE);
+
 
         mLastSessionItem = item;
         mBtnHangupView.setOnClickListener(new View.OnClickListener() {
@@ -178,6 +166,7 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         mCollapsingText2.setText(getString(R.string.state_connected_call));
         mBtnHangupView.setVisibility(View.VISIBLE);
         mBtnAnswerView.setVisibility(View.GONE);
+        mVideoPanel.setVisibility(View.VISIBLE);
 
         mLastSessionItem = item;
         mBtnHangupView.setOnClickListener(new View.OnClickListener() {
@@ -206,12 +195,9 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
     }
 
     private void registerVoIPReceiver () {
-        mIncomingCallReceiver = new IncomingCallReceiver();
-        IntentFilter intentFilter = new IntentFilter(VoIPEngineService.NOTIFY_INCOMING_CALL);
-        intentFilter.addAction(VoIPEngineService.NOTIFY_CALL_CONNECTED);
-        intentFilter.addAction(VoIPEngineService.NOTIFY_CALL_DISCONNECTED);
-        intentFilter.addAction(VoIPEngineService.NOTIFY_OUTGOING_CALL);
-        getActivity().registerReceiver(mIncomingCallReceiver, intentFilter);
+        mVoIPEngineListener = new VoIPEngineListener();
+        VoIPEngineService.getInstance()
+                .addEngineEventListener(mVoIPEngineListener);
     }
 
 
@@ -244,27 +230,23 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
 
 
     private void notifyService (String action) {
-        Activity activity = getActivity();
-        Intent intent = new Intent(action, Uri.EMPTY, activity, VoIPEngineService.class);
-        intent.putExtra(VoIPEngineService.EXTRA_CALL_SESSION, mLastSessionItem);
+        mLastSessionItem.setAction(action);
 
         if (action.equals(VoIPEngineService.ACTION_ANSWER_CALL)) {
-            intent.putExtra(VoIPEngineService.EXTRA_LOCAL_RENDERER, localProxyRenderer);
-            intent.putExtra(VoIPEngineService.EXTRA_REMOTE_RENDERER, remoteProxyRenderer);
+            mLastSessionItem.setLocalProxyRenderer(localProxyRenderer);
+            mLastSessionItem.setRemoteProxyRenderer(remoteProxyRenderer);
         }
-        activity.startService(intent);
+        VoIPEngineService.getInstance().onStartCommand(mLastSessionItem);
     }
 
     public void notifyStartCall (BluetoothDeviceItem device) {
-        Activity activityContext = getActivity();
-        Intent intent = new Intent(VoIPEngineService.ACTION_START_CALL, Uri.EMPTY,
-                activityContext, VoIPEngineService.class);
-        intent.putExtra(VoIPEngineService.EXTRA_CALL_SESSION,
-                new CallSessionItem(device.getDeviceName(), device.getDeviceAddress()));
+        CallSessionItem item = new CallSessionItem(device.getDeviceName(),
+                device.getDeviceAddress());
 
-        intent.putExtra(VoIPEngineService.EXTRA_LOCAL_RENDERER, localProxyRenderer);
-        intent.putExtra(VoIPEngineService.EXTRA_REMOTE_RENDERER, remoteProxyRenderer);
-        activityContext.startService(intent);
+        item.setAction(VoIPEngineService.ACTION_START_CALL);
+        item.setLocalProxyRenderer(localProxyRenderer);
+        item.setRemoteProxyRenderer(remoteProxyRenderer);
+        VoIPEngineService.getInstance().onStartCommand(item);
     }
 
     @Override
@@ -307,34 +289,68 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         mCollapsingParent.setScaleY(updatedScale);
     }
 
+
     /**
      * ****************************************************
      * Defined receiver for receiving call actions.
      */
-    private class IncomingCallReceiver extends BroadcastReceiver {
+    private class VoIPEngineListener implements VoIPEngineService.VoIPEngineEvents {
+
+        private static final int CALL_SESSION_FRAGMENT_POS = 0;
+        private Handler mLocalUiHandler = new Handler(Looper.getMainLooper());
 
         @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            CallSessionItem session = (CallSessionItem) intent
-                    .getSerializableExtra(VoIPEngineService.EXTRA_CALL_SESSION);
-
-            switch (action) {
-                case VoIPEngineService.NOTIFY_INCOMING_CALL:
-                    handleIncomingCall(session);
-                    break;
-                case VoIPEngineService.NOTIFY_CALL_CONNECTED:
-                    handleCallConnected(session);
-                    break;
-                case VoIPEngineService.NOTIFY_CALL_DISCONNECTED:
-                    handleCallDisconnected(session);
-                    break;
-                case VoIPEngineService.NOTIFY_OUTGOING_CALL:
-                    handleOutgoingCall(session);
-                    break;
-            }
+        public void onOutgoingCall(final CallSessionItem item) {
+            mLocalUiHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    handleOutgoingCall(item);
+                }
+            });
         }
 
+        @Override
+        public void onIncomingCall(final CallSessionItem item) {
+            mLocalUiHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    handleIncomingCall(item);
+                }
+            });
+        }
+
+        @Override
+        public void onSignalingMsg(final SignalingMessageItem item) {
+            mLocalUiHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    Fragment fragment = mLocalFragmentAdapter.getItem(CALL_SESSION_FRAGMENT_POS);
+                    if (fragment instanceof CallSessionFragment && fragment.isAdded()) {
+                        ((CallSessionFragment) fragment).handleSignalingMsg(item);
+                    }
+                }
+            });
+        }
+
+        @Override
+        public void onConnected(final CallSessionItem item) {
+            mLocalUiHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    handleCallConnected(item);
+                }
+            });
+        }
+
+        @Override
+        public void onDisconnected(final CallSessionItem item) {
+            mLocalUiHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    handleCallDisconnected(item);
+                }
+            });
+        }
     }
 
     /**

@@ -1,5 +1,6 @@
 package com.gensagames.samplewebrtc.view;
 
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -23,6 +24,8 @@ import com.gensagames.samplewebrtc.view.helper.FragmentHeaderTransaction;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static Context contextInstance;
+
     private View mHeaderInstanceView;
     private DrawerLayout mDrawerLayout;
     private NavigationView mNavigationView;
@@ -35,8 +38,12 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         setNavigationDrawer();
 
-        startService(new Intent(VoIPEngineService.ACTION_IDLE, Uri.EMPTY,
-                getApplicationContext(), VoIPEngineService.class));
+        contextInstance = getApplicationContext();
+        VoIPEngineService.getInstance();
+    }
+
+    public static Context getContextInstance() {
+        return contextInstance;
     }
 
     private void setNavigationDrawer () {

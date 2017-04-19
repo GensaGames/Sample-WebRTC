@@ -1,5 +1,11 @@
 package com.gensagames.samplewebrtc.model;
 
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+
+import com.gensagames.samplewebrtc.engine.VoIPEngineService;
+import com.gensagames.samplewebrtc.engine.utils.ProxyRenderer;
+
 import java.io.Serializable;
 
 /**
@@ -21,7 +27,12 @@ public class CallSessionItem implements Serializable {
 
     private String remoteName;
     private String bluetoothAddress;
-    private CallState connectionState;
+    private String action = VoIPEngineService.ACTION_IDLE;
+
+    private ProxyRenderer localProxyRenderer;
+    private ProxyRenderer remoteProxyRenderer;
+
+    private CallState connectionState = CallState.IDLE;
     private long sessionId;
 
     public CallSessionItem(String remoteName, String bluetoothAddress) {
@@ -51,11 +62,12 @@ public class CallSessionItem implements Serializable {
         this.bluetoothAddress = bluetoothAddress;
     }
 
+    @NonNull
     public CallState getConnectionState() {
         return connectionState;
     }
 
-    public void setConnectionState(CallState connectionState) {
+    public void setConnectionState(@NonNull CallState connectionState) {
         this.connectionState = connectionState;
     }
 
@@ -65,5 +77,32 @@ public class CallSessionItem implements Serializable {
 
     public void setSessionId(long sessionId) {
         this.sessionId = sessionId;
+    }
+
+    @NonNull
+    public String getAction() {
+        return action;
+    }
+
+    public void setAction(@NonNull String action) {
+        this.action = action;
+    }
+
+    @Nullable
+    public ProxyRenderer getLocalProxyRenderer() {
+        return localProxyRenderer;
+    }
+
+    public void setLocalProxyRenderer(ProxyRenderer localProxyRenderer) {
+        this.localProxyRenderer = localProxyRenderer;
+    }
+
+    @Nullable
+    public ProxyRenderer getRemoteProxyRenderer() {
+        return remoteProxyRenderer;
+    }
+
+    public void setRemoteProxyRenderer(ProxyRenderer remoteProxyRenderer) {
+        this.remoteProxyRenderer = remoteProxyRenderer;
     }
 }
