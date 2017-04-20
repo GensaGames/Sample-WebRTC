@@ -139,6 +139,7 @@ public class VoIPEngineService {
             return;
         }
         holder.getSession().closeSession();
+        RTCClient.getInstance().cleanupMedia();
         mSessionMap.remove(sessionId);
 
         for (VoIPEngineEvents events : mEngineEventsList) {
@@ -227,14 +228,17 @@ public class VoIPEngineService {
                 SessionInfoHolder holder = mSessionMap.get(sessionId);
                 holder.setRTCSession(session);
 
+                /**
+                 * Session ID should be configured, to be the same, of both side.
+                 * It will help, to resolve objects during signaling
+                 */
                 session.setSessionId(sessionId);
                 session.setRemoteCandidates(holder.getRemoteIceCandidates());
                 session.setPeerEventsListener(new PeerEventsHandler(sessionId));
                 session.setRemoteDescription(holder.getRemoteSdp());
                 session.createAnswer();
             }
-        }, VideoCaptures.createCorrectCapturer(MainActivity.getContextInstance()),
-                item.getLocalProxyRenderer(), item.getRemoteProxyRenderer());
+        }, item.getLocalProxyRenderer(), item.getRemoteProxyRenderer());
     }
 
     /**
@@ -264,8 +268,7 @@ public class VoIPEngineService {
                 session.setPeerEventsListener(new PeerEventsHandler(sessionId));
                 session.createOffer();
             }
-        }, VideoCaptures.createCorrectCapturer(MainActivity.getContextInstance()),
-                item.getLocalProxyRenderer(), item.getRemoteProxyRenderer());
+        }, item.getLocalProxyRenderer(), item.getRemoteProxyRenderer());
     }
 
     /**
@@ -330,10 +333,8 @@ public class VoIPEngineService {
             Log.d(TAG, "onIceDisconnected");
             CallSessionItem item  = mSessionMap.get(mSessionId).getCallSessionItem();
             item.setConnectionState(CallSessionItem.CallState.DISCONNECTED);
-
-            for (VoIPEngineEvents events : mEngineEventsList) {
-                events.onDisconnected(item);
-            }
+            item.setAction(ACTION_HANGUP_CALL);
+            onStartCommand(item);
         }
 
         @Override
@@ -341,7 +342,7 @@ public class VoIPEngineService {
 
         }
 
-        private void signalingSdp (SessionDescription sdp) {
+        private synchronized void signalingSdp (SessionDescription sdp) {
             SignalingMessageItem messageItem = new SignalingMessageItem(mSessionMap.get(mSessionId)
                     .getCallSessionItem().getRemoteName(), mSessionId, SignalingMessageItem
                     .MessageType.SDP_EXCHANGE, sdp, null);
