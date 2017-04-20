@@ -12,8 +12,11 @@ import com.gensagames.samplewebrtc.view.helper.BaseActivity;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class SplashActivity extends BaseActivity {
+
+    private static final long DELAY_START = 500L;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -29,7 +32,7 @@ public class SplashActivity extends BaseActivity {
             public void run() {
                 checkActivityPermissions();
             }
-        }, 500);
+        }, DELAY_START);
     }
 
     @Override
@@ -55,8 +58,8 @@ public class SplashActivity extends BaseActivity {
         startActivity(new Intent(SplashActivity.this, MainActivity.class));
 
         for (String permission : deniedPermissions) {
-            Toast.makeText(SplashActivity.this, "Permission denied: " + permission.split("\\.")[2],
-                    Toast.LENGTH_LONG).show();
+            Toast.makeText(SplashActivity.this, "Permission denied: "
+                    + permission.split("\\.")[2], Toast.LENGTH_LONG).show();
         }
     }
 

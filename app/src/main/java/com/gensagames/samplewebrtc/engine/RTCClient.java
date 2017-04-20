@@ -8,6 +8,8 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.gensagames.samplewebrtc.engine.parameters.PeerConnectionParameters;
+import com.gensagames.samplewebrtc.engine.utils.VideoCaptures;
+import com.gensagames.samplewebrtc.view.MainActivity;
 
 import org.webrtc.AudioSource;
 import org.webrtc.AudioTrack;
@@ -30,7 +32,6 @@ import org.webrtc.voiceengine.WebRtcAudioUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -44,15 +45,18 @@ import static com.gensagames.samplewebrtc.engine.parameters.Configs.*;
 
 public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallback {
 
+    /**
+     * Just tracing values, for logs and other info
+     */
     private static final String TAG = RTCClient.class.getSimpleName();
     private static final String NATIVE_TRACE_USE = "logcat:";
     private static final String FILE_TRACE_NAME = "app-webrtc.txt";
     private static final String FILE_AUDIO_DUMP = "audio.aecdump";
 
-    private static RTCClient instance;
-    private EglBase mRootEglBase;
+    private static RTCClient sClientInstance;
+    private static Executor sWorkingExecutor;
+    private static EglBase sRootEglBase;
 
-    private Executor mWorkingExecutor;
     private PeerConnectionFactory.Options mPeerFactoryOptions;
     private PeerConnectionParameters mPeerConnectionParameters;
     private PeerConnectionFactory mPeerFactory;
@@ -62,6 +66,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
     private MediaConstraints mSdpMediaConstraints;
 
     private ParcelFileDescriptor mAecDumpFileDescriptor;
+    private VideoCapturer mVideoCapturer;
     private MediaStream mMediaStream;
     private AudioSource mAudioSource;
     private VideoSource mVideoSource;
@@ -75,27 +80,27 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
     }
 
     private RTCClient() {
-        mWorkingExecutor = Executors.newSingleThreadScheduledExecutor();
-        mRootEglBase = EglBase.create();
+        sWorkingExecutor = Executors.newSingleThreadScheduledExecutor();
+        sRootEglBase = EglBase.create();
     }
 
     public static RTCClient getInstance() {
-        if (instance == null) {
+        if (sClientInstance == null) {
             synchronized (RTCClient.class) {
-                if (instance == null) {
-                    instance = new RTCClient();
+                if (sClientInstance == null) {
+                    sClientInstance = new RTCClient();
                 }
             }
         }
-        return instance;
+        return sClientInstance;
     }
 
     public Executor getExecutor () {
-        return mWorkingExecutor;
+        return sWorkingExecutor;
     }
 
     public EglBase getRootEglBase () {
-        return mRootEglBase;
+        return sRootEglBase;
     }
 
     public PeerConnectionParameters getPeerConnectionParameters () {
@@ -112,7 +117,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
                                   @Nullable final FactoryCreationListener factoryCreationListener) {
         this.mPeerConnectionParameters = peerConnectionParameters;
         this.mPeerFactoryOptions = options;
-        mWorkingExecutor.execute(new Runnable() {
+        sWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 createPeerFactoryInternal(context, factoryCreationListener);
@@ -122,13 +127,12 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
 
 
     public void createPeerConnection (@NonNull final PeerCreationListener peerCreationListener,
-                                      @Nullable final VideoCapturer videoCapturer,
                                       @Nullable final VideoRenderer.Callbacks videoCallbackLocal,
                                       @Nullable final VideoRenderer.Callbacks videoCallbacksRemote) {
-        mWorkingExecutor.execute(new Runnable() {
+        sWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                createPeerConnectionInternal(peerCreationListener, videoCapturer,
+                createPeerConnectionInternal(peerCreationListener,
                         videoCallbackLocal, videoCallbacksRemote);
             }
         });
@@ -139,10 +143,10 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
      * Media cleaning up.
      */
     public void cleanupMedia () {
-        mWorkingExecutor.execute(new Runnable() {
+        sWorkingExecutor.execute(new Runnable() {
             @Override
             public void run() {
-
+                cleanupMediaInternal();
             }
         });
     }
@@ -265,7 +269,6 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
      * EglBase.Context renderEGLContext for PeerConnectionFactory
      */
     private void createPeerConnectionInternal(@NonNull PeerCreationListener peerCreationListener,
-                                      @Nullable VideoCapturer videoCapturer,
                                       @Nullable VideoRenderer.Callbacks videoLocalRenderer,
                                       @Nullable VideoRenderer.Callbacks videoRemoteRenderer) {
         if (mPeerFactory == null) {
@@ -276,9 +279,9 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         PeerConnection peerConnection;
         DataChannel dataChannel = null;
 
-        if (mPeerConnectionParameters.videoCallEnabled && mRootEglBase != null) {
-            mPeerFactory.setVideoHwAccelerationOptions(mRootEglBase.getEglBaseContext(),
-                    mRootEglBase.getEglBaseContext());
+        if (mPeerConnectionParameters.videoCallEnabled && sRootEglBase != null) {
+            mPeerFactory.setVideoHwAccelerationOptions(sRootEglBase.getEglBaseContext(),
+                    sRootEglBase.getEglBaseContext());
         }
         PeerConnection.RTCConfiguration rtcConfig =
                 new PeerConnection.RTCConfiguration(mPeerConnectionParameters.iceServers);
@@ -314,8 +317,8 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
          * create/add them to the main MediaStream
          */
         Log.d(TAG, "Check and create Media...");
-        createMediaStream(videoCapturer);
-        createTracks(videoCapturer, videoLocalRenderer);
+        createMediaStream();
+        createTracks(videoLocalRenderer);
         peerConnection.addStream(mMediaStream);
 
         if (mPeerConnectionParameters.aecDump) {
@@ -330,26 +333,53 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
             }
         }
         peerCreationListener.onPeerCreated(rtcSession.configure(peerConnection, dataChannel,
-                videoCapturer, videoLocalRenderer, videoRemoteRenderer));
+                videoLocalRenderer, videoRemoteRenderer));
     }
 
 
-    private void createMediaStream(VideoCapturer videoCapturer) {
+    private void createMediaStream() {
         if (mMediaStream == null) {
             mMediaStream = mPeerFactory.createLocalMediaStream(getRandomLongUuid());
         }
         if (mAudioSource == null) {
             mAudioSource = mPeerFactory.createAudioSource(mAudioConstraints);
         }
-        if (mPeerConnectionParameters.videoCallEnabled && mVideoSource == null) {
-            mVideoSource = mPeerFactory.createVideoSource(videoCapturer);
+
+        if (mPeerConnectionParameters.videoCallEnabled) {
+            if (mVideoCapturer == null) {
+                mVideoCapturer = VideoCaptures.createCorrectCapturer
+                        (MainActivity.getContextInstance());
+            }
+            if (mVideoSource == null) {
+                mVideoSource = mPeerFactory.createVideoSource(mVideoCapturer);
+            }
         }
     }
 
-    private void createTracks(VideoCapturer videoCapturer,
-                              VideoRenderer.Callbacks videoCallbackLocal) {
+    private void cleanupMediaInternal () {
+        try {
+            if (mAudioSource != null) {
+                mAudioSource.dispose();
+                mAudioSource = null;
+            }
+            if (mVideoSource != null) {
+                mVideoSource.dispose();
+                mVideoSource = null;
+            }
+            if (mVideoCapturer != null) {
+                mVideoCapturer.stopCapture();
+                mVideoCapturer.dispose();
+                mVideoCapturer = null;
+            }
+
+        } catch (InterruptedException e) {
+            Log.e(TAG, "Error stopping capturer!", e);
+        }
+    }
+
+    private void createTracks(VideoRenderer.Callbacks videoCallbackLocal) {
         if (mPeerConnectionParameters.videoCallEnabled) {
-            videoCapturer.startCapture(mPeerConnectionParameters.videoWidth,
+            mVideoCapturer.startCapture(mPeerConnectionParameters.videoWidth,
                     mPeerConnectionParameters.videoHeight, mPeerConnectionParameters.videoFps);
 
             VideoTrack videoTrack = mPeerFactory.createVideoTrack
@@ -363,24 +393,6 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
                 (getRandomLongUuid(), mAudioSource);
         audioTrack.setEnabled(true);
         mMediaStream.addTrack(audioTrack);
-    }
-
-    /**
-     * Only for video configuration!
-     * TODO(Video) Use this method (Based on Chromium sample)
-     */
-    @Nullable
-    private RtpSender findVideoSender(@NonNull PeerConnection peerConnection) {
-        for (RtpSender sender : peerConnection.getSenders()) {
-            if (sender.track() != null) {
-                String trackType = sender.track().kind();
-                if (trackType.equals(VIDEO_TRACK_TYPE)) {
-                    Log.d(TAG, "Found video sender.");
-                    return sender;
-                }
-            }
-        }
-        return null;
     }
 
     private String getRandomLongUuid () {

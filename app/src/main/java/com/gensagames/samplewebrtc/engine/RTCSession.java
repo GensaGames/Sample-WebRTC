@@ -48,8 +48,6 @@ public class RTCSession implements PeerConnection.Observer {
      *  For Video Support only
      */
     @Nullable
-    private VideoCapturer mVideoCapturer;
-    @Nullable
     private VideoRenderer.Callbacks mVideoLocalRenderer;
     @Nullable
     private VideoRenderer.Callbacks mVideoRemoteRenderer;
@@ -106,21 +104,15 @@ public class RTCSession implements PeerConnection.Observer {
     }
 
     protected RTCSession configure(PeerConnection peerConnection, @Nullable DataChannel dataChannel,
-                                   @Nullable VideoCapturer capturer,
                                    @Nullable VideoRenderer.Callbacks local,
                                    @Nullable VideoRenderer.Callbacks remote) {
         mPeerConnection = peerConnection;
         mDataChannel = dataChannel;
-        mVideoCapturer = capturer;
         mVideoLocalRenderer = local;
         mVideoRemoteRenderer = remote;
         return this;
     }
 
-    /**
-     * Session ID should be configured, to be the same, of both side.
-     * It will help, to resolve objects during signaling
-     */
     public long getSessionId () {
         return mSessionId;
     }
@@ -222,7 +214,6 @@ public class RTCSession implements PeerConnection.Observer {
                 }
             }
         });
-        RTCClient.getInstance().cleanupMedia();
 
     }
 
