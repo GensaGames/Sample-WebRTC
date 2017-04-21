@@ -20,6 +20,7 @@ import com.gensagames.samplewebrtc.signaling.BTSignalingObserver;
 import com.gensagames.samplewebrtc.view.MainActivity;
 
 import org.webrtc.IceCandidate;
+import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.SessionDescription;
 import org.webrtc.StatsReport;
@@ -139,12 +140,9 @@ public class VoIPEngineService {
             return;
         }
         holder.getSession().closeSession();
+        holder.getSession().onIceConnectionChange(PeerConnection.
+                IceConnectionState.DISCONNECTED);
         RTCClient.getInstance().cleanupMedia();
-        mSessionMap.remove(sessionId);
-
-        for (VoIPEngineEvents events : mEngineEventsList) {
-            events.onDisconnected(item);
-        }
     }
 
     private synchronized void handleIncomingCandidates (SignalingMessageItem item) {
@@ -288,6 +286,7 @@ public class VoIPEngineService {
      */
 
     private class PeerEventsHandler implements RTCSession.PeerEventsListener {
+
         private long mSessionId;
 
         public PeerEventsHandler(long sessionId) {
@@ -313,33 +312,46 @@ public class VoIPEngineService {
         }
 
         @Override
-        public void onIceCandidatesRemoved(IceCandidate[] candidates) {
-            Log.d(TAG, "onIceCandidatesRemoved");
+        public void onIceConnected() {
+            Log.d(TAG, "onIceConnected");
+            notifyConnectionState(CallSessionItem.CallState.CONNECTED);
         }
 
         @Override
-        public void onIceConnected() {
-            Log.d(TAG, "onIceConnected");
-            CallSessionItem item  = mSessionMap.get(mSessionId).getCallSessionItem();
-            item.setConnectionState(CallSessionItem.CallState.CONNECTED);
-
-            for (VoIPEngineEvents events : mEngineEventsList) {
-                events.onConnected(item);
-            }
+        public void onIceFailed() {
+            Log.d(TAG, "onIceFailed");
+            notifyConnectionState(CallSessionItem.CallState.DISCONNECTED);
         }
 
         @Override
         public void onIceDisconnected() {
             Log.d(TAG, "onIceDisconnected");
-            CallSessionItem item  = mSessionMap.get(mSessionId).getCallSessionItem();
-            item.setConnectionState(CallSessionItem.CallState.DISCONNECTED);
-            item.setAction(ACTION_HANGUP_CALL);
-            onStartCommand(item);
+            notifyConnectionState(CallSessionItem.CallState.DISCONNECTED);
         }
 
         @Override
         public void onPeerConnectionStatsReady(StatsReport[] reports) {
 
+        }
+
+        private void notifyConnectionState (CallSessionItem.CallState state) {
+            CallSessionItem item  = mSessionMap.get(mSessionId).getCallSessionItem();
+            item.setConnectionState(state);
+
+            if (state == CallSessionItem.CallState.DISCONNECTED) {
+                mSessionMap.remove(mSessionId);
+                item.setAction(ACTION_HANGUP_CALL);
+                onStartCommand(item);
+
+                for (VoIPEngineEvents events : mEngineEventsList) {
+                    events.onDisconnected(item);
+                }
+            }
+            if (state == CallSessionItem.CallState.CONNECTED) {
+                for (VoIPEngineEvents events : mEngineEventsList) {
+                    events.onConnected(item);
+                }
+            }
         }
 
         private synchronized void signalingSdp (SessionDescription sdp) {

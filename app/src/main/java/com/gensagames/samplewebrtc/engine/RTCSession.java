@@ -7,6 +7,7 @@ import com.gensagames.samplewebrtc.engine.parameters.Configs;
 import com.gensagames.samplewebrtc.engine.parameters.PeerConnectionParameters;
 import com.gensagames.samplewebrtc.engine.utils.SdpConfig;
 
+import org.webrtc.AudioTrack;
 import org.webrtc.DataChannel;
 import org.webrtc.IceCandidate;
 import org.webrtc.MediaStream;
@@ -37,6 +38,9 @@ public class RTCSession implements PeerConnection.Observer {
     private PeerConnection mPeerConnection;
     private PeerSdpObserver mSdpObserver;
     private DataChannel mDataChannel;
+
+    private AudioTrack mAudioTrack;
+    private VideoTrack mVideoTrack;
 
     private Executor mWorkingExecutor;
     private List<IceCandidate> mQueuedRemoteCandidates;
@@ -72,11 +76,6 @@ public class RTCSession implements PeerConnection.Observer {
         void onIceCandidate(final IceCandidate candidate);
 
         /**
-         * Callback fired once local ICE candidates are removed.
-         */
-        void onIceCandidatesRemoved(final IceCandidate[] candidates);
-
-        /**
          * Callback fired once connection is established (IceConnectionState is
          * CONNECTED).
          */
@@ -87,6 +86,8 @@ public class RTCSession implements PeerConnection.Observer {
          * DISCONNECTED).
          */
         void onIceDisconnected();
+
+        void onIceFailed();
 
         /**
          * Callback fired once peer connection statistics is ready.
@@ -104,8 +105,11 @@ public class RTCSession implements PeerConnection.Observer {
     }
 
     protected RTCSession configure(PeerConnection peerConnection, @Nullable DataChannel dataChannel,
+                                   AudioTrack audioTrack, VideoTrack videoTrack,
                                    @Nullable VideoRenderer.Callbacks local,
                                    @Nullable VideoRenderer.Callbacks remote) {
+        mAudioTrack = audioTrack;
+        mVideoTrack = videoTrack;
         mPeerConnection = peerConnection;
         mDataChannel = dataChannel;
         mVideoLocalRenderer = local;
@@ -121,13 +125,8 @@ public class RTCSession implements PeerConnection.Observer {
         mSessionId = sessionId;
     }
 
-
     public PeerConnection.IceConnectionState getIceConnectionState() {
         return mIceConnectionState;
-    }
-
-    public SessionDescription getWorkingSdp() {
-        return mWorkingSdp;
     }
 
     public void setRemoteCandidates (List<IceCandidate> iceCandidates) {
@@ -212,6 +211,9 @@ public class RTCSession implements PeerConnection.Observer {
                     mPeerConnection.close();
                     mPeerConnection = null;
                 }
+                MediaStream localMediaStream = RTCClient.getInstance().getLocalMediaStream();
+                localMediaStream.removeTrack(mAudioTrack);
+                localMediaStream.removeTrack(mVideoTrack);
             }
         });
 
@@ -240,6 +242,8 @@ public class RTCSession implements PeerConnection.Observer {
                         mPeerEventsListener.onIceConnected();
                         break;
                     case FAILED:
+                        mPeerEventsListener.onIceFailed();
+                        break;
                     case DISCONNECTED:
                         mPeerEventsListener.onIceDisconnected();
                         break;
@@ -281,7 +285,7 @@ public class RTCSession implements PeerConnection.Observer {
     public void onAddStream(MediaStream mediaStream) {
         Log.d(TAG, "onAddStream");
 
-        /**
+        /*
          * Only for Video! Catching remote
          * Video tracks to add Renderer!
          */

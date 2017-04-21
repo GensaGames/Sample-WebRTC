@@ -103,6 +103,10 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         return sRootEglBase;
     }
 
+    public MediaStream getLocalMediaStream () {
+        return mMediaStream;
+    }
+
     public PeerConnectionParameters getPeerConnectionParameters () {
         return mPeerConnectionParameters;
     }
@@ -158,7 +162,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
      * PeerConnectionFactory.setVideoHwAccelerationOptions
      * (renderEGLContext, renderEGLContext);
      */
-    private void createPeerFactoryInternal(Context context,
+    private synchronized void createPeerFactoryInternal(Context context,
                                            FactoryCreationListener factoryCreationListener) {
         PeerConnectionFactory.initializeInternalTracer();
         if (mPeerConnectionParameters.tracing) {
@@ -225,7 +229,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         }
     }
 
-    private void createMediaConstraints() {
+    private synchronized void createMediaConstraints() {
         mPeerConstraints = new MediaConstraints();
         mPeerConstraints.optional.add(new MediaConstraints.
                 KeyValuePair(DTLS_SRTP_KEY_AGREEMENT_CONSTRAINT, "true"));
@@ -268,7 +272,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
      * For creation PeerConnection with Video enable, we should also use
      * EglBase.Context renderEGLContext for PeerConnectionFactory
      */
-    private void createPeerConnectionInternal(@NonNull PeerCreationListener peerCreationListener,
+    private synchronized void createPeerConnectionInternal(@NonNull PeerCreationListener peerCreationListener,
                                       @Nullable VideoRenderer.Callbacks videoLocalRenderer,
                                       @Nullable VideoRenderer.Callbacks videoRemoteRenderer) {
         if (mPeerFactory == null) {
@@ -278,6 +282,8 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         RTCSession rtcSession = new RTCSession();
         PeerConnection peerConnection;
         DataChannel dataChannel = null;
+        AudioTrack audioTrack = null;
+        VideoTrack videoTrack = null;
 
         if (mPeerConnectionParameters.videoCallEnabled && sRootEglBase != null) {
             mPeerFactory.setVideoHwAccelerationOptions(sRootEglBase.getEglBaseContext(),
@@ -318,7 +324,11 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
          */
         Log.d(TAG, "Check and create Media...");
         createMediaStream();
-        createTracks(videoLocalRenderer);
+        audioTrack = createAudioTrack();
+        if (mPeerConnectionParameters.videoCallEnabled
+                && videoLocalRenderer != null) {
+            videoTrack = createVideoTrack(videoLocalRenderer);
+        }
         peerConnection.addStream(mMediaStream);
 
         if (mPeerConnectionParameters.aecDump) {
@@ -333,11 +343,11 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
             }
         }
         peerCreationListener.onPeerCreated(rtcSession.configure(peerConnection, dataChannel,
-                videoLocalRenderer, videoRemoteRenderer));
+                audioTrack, videoTrack, videoLocalRenderer, videoRemoteRenderer));
     }
 
 
-    private void createMediaStream() {
+    private synchronized void createMediaStream() {
         if (mMediaStream == null) {
             mMediaStream = mPeerFactory.createLocalMediaStream(getRandomLongUuid());
         }
@@ -353,10 +363,12 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
             if (mVideoSource == null) {
                 mVideoSource = mPeerFactory.createVideoSource(mVideoCapturer);
             }
+            mVideoCapturer.startCapture(mPeerConnectionParameters.videoWidth,
+                    mPeerConnectionParameters.videoHeight, mPeerConnectionParameters.videoFps);
         }
     }
 
-    private void cleanupMediaInternal () {
+    private synchronized void cleanupMediaInternal () {
         try {
             if (mAudioSource != null) {
                 mAudioSource.dispose();
@@ -377,22 +389,21 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         }
     }
 
-    private void createTracks(VideoRenderer.Callbacks videoCallbackLocal) {
-        if (mPeerConnectionParameters.videoCallEnabled) {
-            mVideoCapturer.startCapture(mPeerConnectionParameters.videoWidth,
-                    mPeerConnectionParameters.videoHeight, mPeerConnectionParameters.videoFps);
+    private VideoTrack createVideoTrack (@NonNull VideoRenderer.Callbacks videoCallbackLocal) {
+        VideoTrack videoTrack = mPeerFactory.createVideoTrack
+                (getRandomLongUuid(), mVideoSource);
+        videoTrack.addRenderer(new VideoRenderer(videoCallbackLocal));
+        videoTrack.setEnabled(true);
+        mMediaStream.addTrack(videoTrack);
+        return videoTrack;
+    }
 
-            VideoTrack videoTrack = mPeerFactory.createVideoTrack
-                    (getRandomLongUuid(), mVideoSource);
-            videoTrack.addRenderer(new VideoRenderer(videoCallbackLocal));
-            videoTrack.setEnabled(true);
-            mMediaStream.addTrack(videoTrack);
-        }
-
+    private AudioTrack createAudioTrack () {
         AudioTrack audioTrack = mPeerFactory.createAudioTrack
                 (getRandomLongUuid(), mAudioSource);
         audioTrack.setEnabled(true);
         mMediaStream.addTrack(audioTrack);
+        return audioTrack;
     }
 
     private String getRandomLongUuid () {
@@ -402,7 +413,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
 
 
 
-    /**
+    /*
      * -------------------------------------------------------------------
      * -------------------------------------------------------------------
      */
