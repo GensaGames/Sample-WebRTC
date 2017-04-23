@@ -341,7 +341,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
                 Log.e(TAG, "Can not open aecdump file!", e);
             }
         }
-        peerCreationListener.onPeerCreated(rtcSession.configure(peerConnection, dataChannel, null,
+        peerCreationListener.onPeerCreated(rtcSession.configure(peerConnection, dataChannel,
                 audioTrack, videoTrack, videoLocalRenderer, videoRemoteRenderer));
     }
 

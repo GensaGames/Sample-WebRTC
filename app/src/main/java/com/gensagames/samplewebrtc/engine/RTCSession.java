@@ -40,7 +40,6 @@ public class RTCSession implements PeerConnection.Observer {
     private PeerSdpObserver mSdpObserver;
     private DataChannel mDataChannel;
 
-    private EglBase mEglBase;
     private AudioTrack mAudioTrack;
     private VideoTrack mVideoTrack;
 
@@ -107,7 +106,7 @@ public class RTCSession implements PeerConnection.Observer {
     }
 
     protected RTCSession configure(PeerConnection peerConnection, @Nullable DataChannel dataChannel,
-                                   @Nullable EglBase eglBase, AudioTrack audioTrack, VideoTrack videoTrack,
+                                   AudioTrack audioTrack, VideoTrack videoTrack,
                                    @Nullable VideoRenderer.Callbacks local,
                                    @Nullable VideoRenderer.Callbacks remote) {
         mAudioTrack = audioTrack;
@@ -116,7 +115,6 @@ public class RTCSession implements PeerConnection.Observer {
         mDataChannel = dataChannel;
         mVideoLocalRenderer = local;
         mVideoRemoteRenderer = remote;
-        mEglBase = eglBase;
         return this;
     }
 
@@ -214,10 +212,7 @@ public class RTCSession implements PeerConnection.Observer {
                     mPeerConnection.close();
                     mPeerConnection = null;
                 }
-                if (mEglBase != null) {
-                    mEglBase.release();
-                    mEglBase = null;
-                }
+
                 MediaStream localMediaStream = RTCClient.getInstance().getLocalMediaStream();
                 localMediaStream.removeTrack(mAudioTrack);
                 localMediaStream.removeTrack(mVideoTrack);

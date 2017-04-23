@@ -1,26 +1,18 @@
 package com.gensagames.samplewebrtc.engine;
 
-import android.app.Application;
-import android.app.Service;
 import android.bluetooth.BluetoothDevice;
-import android.content.Intent;
 import android.os.Handler;
-import android.os.IBinder;
 import android.os.Looper;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.gensagames.samplewebrtc.engine.parameters.PeerConnectionParameters;
-import com.gensagames.samplewebrtc.engine.utils.ProxyRenderer;
-import com.gensagames.samplewebrtc.engine.utils.VideoCaptures;
 import com.gensagames.samplewebrtc.model.CallSessionItem;
 import com.gensagames.samplewebrtc.model.SignalingMessageItem;
 import com.gensagames.samplewebrtc.signaling.BTSignalingObserver;
 import com.gensagames.samplewebrtc.view.MainActivity;
 
 import org.webrtc.IceCandidate;
-import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.SessionDescription;
 import org.webrtc.StatsReport;
@@ -140,8 +132,11 @@ public class VoIPEngineService {
             return;
         }
         holder.getSession().closeSession();
-        RTCClient.getInstance().cleanupMedia();
+
         mSessionMap.remove(sessionId);
+        if (mSessionMap.size() == 0) {
+            RTCClient.getInstance().cleanupMedia();
+        }
 
         for (VoIPEngineEvents events : mEngineEventsList) {
             events.onDisconnected(item);
@@ -317,19 +312,19 @@ public class VoIPEngineService {
         @Override
         public void onIceConnected() {
             Log.d(TAG, "onIceConnected");
-            notifyConnectionState(CallSessionItem.CallState.CONNECTED);
+            notifyConnected();
         }
 
         @Override
         public void onIceFailed() {
             Log.d(TAG, "onIceFailed");
-            notifyConnectionState(CallSessionItem.CallState.DISCONNECTED);
+            notifyDisconnect();
         }
 
         @Override
         public void onIceDisconnected() {
             Log.d(TAG, "onIceDisconnected");
-            notifyConnectionState(CallSessionItem.CallState.DISCONNECTED);
+            notifyDisconnect();
         }
 
         @Override
@@ -337,18 +332,17 @@ public class VoIPEngineService {
 
         }
 
-        private void notifyConnectionState (CallSessionItem.CallState state) {
+        private void notifyDisconnect() {
             CallSessionItem item  = mSessionMap.get(mSessionId).getCallSessionItem();
-            item.setConnectionState(state);
+            item.setConnectionState(CallSessionItem.CallState.DISCONNECTED);
+            item.setAction(ACTION_HANGUP_CALL);
+            onStartCommand(item);
+        }
 
-            if (state == CallSessionItem.CallState.DISCONNECTED) {
-                item.setAction(ACTION_HANGUP_CALL);
-                onStartCommand(item);
-            }
-            if (state == CallSessionItem.CallState.CONNECTED) {
-                for (VoIPEngineEvents events : mEngineEventsList) {
-                    events.onConnected(item);
-                }
+        private void notifyConnected () {
+            CallSessionItem item  = mSessionMap.get(mSessionId).getCallSessionItem();
+            for (VoIPEngineEvents events : mEngineEventsList) {
+                events.onConnected(item);
             }
         }
 
