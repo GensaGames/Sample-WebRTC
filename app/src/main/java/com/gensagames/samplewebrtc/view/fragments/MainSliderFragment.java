@@ -19,9 +19,11 @@ import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.view.ViewPager;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.gensagames.samplewebrtc.R;
@@ -35,6 +37,7 @@ import com.gensagames.samplewebrtc.view.helper.CollapseAppBarLayoutBehavior;
 import com.gensagames.samplewebrtc.view.helper.FragmentHeaderTransaction;
 import com.gensagames.samplewebrtc.view.helper.OnSliderPageSelected;
 
+import org.webrtc.EglBase;
 import org.webrtc.RendererCommon;
 import org.webrtc.SurfaceViewRenderer;
 import org.webrtc.VideoRenderer;
@@ -62,7 +65,7 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
     private TextView mCollapsingText1;
     private TextView mCollapsingText2;
 
-    private View mVideoPanel;
+    private LinearLayout mVideoPanel;
     private SurfaceViewRenderer pipRenderer;
     private SurfaceViewRenderer fullscreenRenderer;
     private final ProxyRenderer remoteProxyRenderer = new ProxyRenderer();
@@ -87,12 +90,9 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         mViewPager = (ViewPager) x.findViewById(R.id.viewpager);
         mBtnAnswerView = x.findViewById(R.id.fragmentBtnAnswer);
         mBtnHangupView = x.findViewById(R.id.fragmentBtnHangup);
-        mVideoPanel = x.findViewById(R.id.fragmentVideoPanel);
-        pipRenderer = (SurfaceViewRenderer) x.findViewById(R.id.pip_video_view);
-        fullscreenRenderer = (SurfaceViewRenderer) x.findViewById(R.id.fullscreen_video_view);
+        mVideoPanel = (LinearLayout) x.findViewById(R.id.fragmentVideoPanel);
 
         setupViewPager();
-        setupVideoRenderer();
         registerVoIPReceiver();
         return x;
     }
@@ -106,10 +106,24 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
 
 
     private void setupVideoRenderer () {
-        pipRenderer.init(RTCClient.getInstance().getRootEglBase().getEglBaseContext(), null);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams
+                (ViewGroup.LayoutParams.MATCH_PARENT, (int) (TypedValue.applyDimension
+                (TypedValue.COMPLEX_UNIT_DIP, 144, getResources().getDisplayMetrics())), 1.0f);
+
+        pipRenderer = new SurfaceViewRenderer(getActivity());
+        pipRenderer.setLayoutParams(params);
+        mVideoPanel.addView(pipRenderer);
+
+        fullscreenRenderer = new SurfaceViewRenderer(getActivity());
+        fullscreenRenderer.setLayoutParams(params);
+        mVideoPanel.addView(fullscreenRenderer);
+
+        EglBase.Context context = RTCClient.getInstance().getWorkingEglBase().getEglBaseContext();
+
+        pipRenderer.init(context, null);
         pipRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
 
-        fullscreenRenderer.init(RTCClient.getInstance().getRootEglBase().getEglBaseContext(), null);
+        fullscreenRenderer.init(context, null);
         fullscreenRenderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL);
 
         pipRenderer.setZOrderMediaOverlay(true);
@@ -120,6 +134,14 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         remoteProxyRenderer.setTarget(pipRenderer);
         fullscreenRenderer.setMirror(true);
         pipRenderer.setMirror(false);
+    }
+
+    private void cleanupVideoRenderer () {
+        localProxyRenderer.setTarget(null);
+        remoteProxyRenderer.setTarget(null);
+        pipRenderer.release();
+        fullscreenRenderer.release();
+        mVideoPanel.removeAllViews();
     }
 
 
@@ -135,7 +157,7 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
         mVideoPanel.setVisibility(View.GONE);
 
         mLastSessionItem = item;
-        notifyService(VoIPEngineService.ACTION_HANGUP_CALL);
+        cleanupVideoRenderer();
     }
 
     private void handleOutgoingCall (final CallSessionItem item) {
@@ -175,6 +197,7 @@ public class MainSliderFragment extends Fragment implements FragmentHeaderTransa
                 notifyService(VoIPEngineService.ACTION_HANGUP_CALL);
             }
         });
+        setupVideoRenderer();
     }
 
     private void handleIncomingCall(final CallSessionItem item) {

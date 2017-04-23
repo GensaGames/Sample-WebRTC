@@ -9,6 +9,7 @@ import com.gensagames.samplewebrtc.engine.utils.SdpConfig;
 
 import org.webrtc.AudioTrack;
 import org.webrtc.DataChannel;
+import org.webrtc.EglBase;
 import org.webrtc.IceCandidate;
 import org.webrtc.MediaStream;
 import org.webrtc.PeerConnection;
@@ -39,6 +40,7 @@ public class RTCSession implements PeerConnection.Observer {
     private PeerSdpObserver mSdpObserver;
     private DataChannel mDataChannel;
 
+    private EglBase mEglBase;
     private AudioTrack mAudioTrack;
     private VideoTrack mVideoTrack;
 
@@ -97,15 +99,15 @@ public class RTCSession implements PeerConnection.Observer {
     }
 
     protected RTCSession() {
-        mSessionId = UUID.randomUUID().getMostSignificantBits();
         mSdpObserver = new PeerSdpObserver();
+        mSessionId = UUID.randomUUID().getMostSignificantBits();
         mWorkingExecutor = RTCClient.getInstance().getExecutor();
         peerConnectionParameters = RTCClient.getInstance()
                 .getPeerConnectionParameters();
     }
 
     protected RTCSession configure(PeerConnection peerConnection, @Nullable DataChannel dataChannel,
-                                   AudioTrack audioTrack, VideoTrack videoTrack,
+                                   @Nullable EglBase eglBase, AudioTrack audioTrack, VideoTrack videoTrack,
                                    @Nullable VideoRenderer.Callbacks local,
                                    @Nullable VideoRenderer.Callbacks remote) {
         mAudioTrack = audioTrack;
@@ -114,6 +116,7 @@ public class RTCSession implements PeerConnection.Observer {
         mDataChannel = dataChannel;
         mVideoLocalRenderer = local;
         mVideoRemoteRenderer = remote;
+        mEglBase = eglBase;
         return this;
     }
 
@@ -210,6 +213,10 @@ public class RTCSession implements PeerConnection.Observer {
                 if (mPeerConnection != null) {
                     mPeerConnection.close();
                     mPeerConnection = null;
+                }
+                if (mEglBase != null) {
+                    mEglBase.release();
+                    mEglBase = null;
                 }
                 MediaStream localMediaStream = RTCClient.getInstance().getLocalMediaStream();
                 localMediaStream.removeTrack(mAudioTrack);

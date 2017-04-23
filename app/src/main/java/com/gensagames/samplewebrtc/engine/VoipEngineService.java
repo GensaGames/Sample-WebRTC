@@ -140,9 +140,12 @@ public class VoIPEngineService {
             return;
         }
         holder.getSession().closeSession();
-        holder.getSession().onIceConnectionChange(PeerConnection.
-                IceConnectionState.DISCONNECTED);
         RTCClient.getInstance().cleanupMedia();
+        mSessionMap.remove(sessionId);
+
+        for (VoIPEngineEvents events : mEngineEventsList) {
+            events.onDisconnected(item);
+        }
     }
 
     private synchronized void handleIncomingCandidates (SignalingMessageItem item) {
@@ -339,13 +342,8 @@ public class VoIPEngineService {
             item.setConnectionState(state);
 
             if (state == CallSessionItem.CallState.DISCONNECTED) {
-                mSessionMap.remove(mSessionId);
                 item.setAction(ACTION_HANGUP_CALL);
                 onStartCommand(item);
-
-                for (VoIPEngineEvents events : mEngineEventsList) {
-                    events.onDisconnected(item);
-                }
             }
             if (state == CallSessionItem.CallState.CONNECTED) {
                 for (VoIPEngineEvents events : mEngineEventsList) {

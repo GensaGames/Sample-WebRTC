@@ -57,19 +57,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:visibility="gone"
+        android:orientation="horizontal"
         android:layout_gravity="bottom">
-
-        <org.webrtc.SurfaceViewRenderer
-            android:id="@+id/fullscreen_video_view"
-            android:layout_width="match_parent"
-            android:layout_height="144dp"
-            android:layout_weight="1" />
-
-        <org.webrtc.SurfaceViewRenderer
-            android:id="@+id/pip_video_view"
-            android:layout_width="match_parent"
-            android:layout_height="144dp"
-            android:layout_weight="1" />
 
     </LinearLayout>
 

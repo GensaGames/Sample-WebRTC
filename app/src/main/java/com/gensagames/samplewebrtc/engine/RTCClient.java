@@ -20,7 +20,6 @@ import org.webrtc.MediaConstraints;
 import org.webrtc.MediaStream;
 import org.webrtc.PeerConnection;
 import org.webrtc.PeerConnectionFactory;
-import org.webrtc.RtpSender;
 import org.webrtc.VideoCapturer;
 import org.webrtc.VideoRenderer;
 import org.webrtc.VideoSource;
@@ -55,11 +54,11 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
 
     private static RTCClient sClientInstance;
     private static Executor sWorkingExecutor;
-    private static EglBase sRootEglBase;
 
     private PeerConnectionFactory.Options mPeerFactoryOptions;
     private PeerConnectionParameters mPeerConnectionParameters;
     private PeerConnectionFactory mPeerFactory;
+    private EglBase mWorkingEglBase;
 
     private MediaConstraints mPeerConstraints;
     private MediaConstraints mAudioConstraints;
@@ -81,7 +80,6 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
 
     private RTCClient() {
         sWorkingExecutor = Executors.newSingleThreadScheduledExecutor();
-        sRootEglBase = EglBase.create();
     }
 
     public static RTCClient getInstance() {
@@ -99,8 +97,8 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         return sWorkingExecutor;
     }
 
-    public EglBase getRootEglBase () {
-        return sRootEglBase;
+    public EglBase getWorkingEglBase() {
+        return mWorkingEglBase;
     }
 
     public MediaStream getLocalMediaStream () {
@@ -285,9 +283,10 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
         AudioTrack audioTrack = null;
         VideoTrack videoTrack = null;
 
-        if (mPeerConnectionParameters.videoCallEnabled && sRootEglBase != null) {
-            mPeerFactory.setVideoHwAccelerationOptions(sRootEglBase.getEglBaseContext(),
-                    sRootEglBase.getEglBaseContext());
+        if (mPeerConnectionParameters.videoCallEnabled && mWorkingEglBase == null) {
+            mWorkingEglBase = EglBase.create();
+            EglBase.Context context = mWorkingEglBase.getEglBaseContext();
+            mPeerFactory.setVideoHwAccelerationOptions(context, context);
         }
         PeerConnection.RTCConfiguration rtcConfig =
                 new PeerConnection.RTCConfiguration(mPeerConnectionParameters.iceServers);
@@ -342,7 +341,7 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
                 Log.e(TAG, "Can not open aecdump file!", e);
             }
         }
-        peerCreationListener.onPeerCreated(rtcSession.configure(peerConnection, dataChannel,
+        peerCreationListener.onPeerCreated(rtcSession.configure(peerConnection, dataChannel, null,
                 audioTrack, videoTrack, videoLocalRenderer, videoRemoteRenderer));
     }
 
@@ -382,6 +381,10 @@ public class RTCClient implements WebRtcAudioRecord.WebRtcAudioRecordErrorCallba
                 mVideoCapturer.stopCapture();
                 mVideoCapturer.dispose();
                 mVideoCapturer = null;
+            }
+            if (mWorkingEglBase != null) {
+                mWorkingEglBase.release();
+                mWorkingEglBase = null;
             }
 
         } catch (InterruptedException e) {
